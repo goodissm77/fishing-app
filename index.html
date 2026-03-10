@@ -1,0 +1,1795 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#1565C0">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="투데이피싱">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="description" content="오늘의 낚시 포인트 추천 - 날씨·물때·어종 실시간 정보">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%231565C0'/><text y='.9em' font-size='80'>🎣</text></svg>">
+<title>투데이 피싱포인트</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&family=Montserrat:wght@400;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+:root {
+  --sky:#E8F4FD;--sea:#2196F3;--sea-deep:#0D47A1;--sea-light:#64B5F6;
+  --mint:#00BCD4;--mint-light:#E0F7FA;--coral:#FF7043;--sand:#FFF8E1;--sand-dark:#FFE082;
+  --gray-100:#F5F7FA;--gray-200:#E8ECF0;--gray-400:#9BA5B0;--gray-600:#5A6472;--gray-800:#2C3340;
+  --success:#26A69A;--warning:#FFA726;--hot:#FF5252;
+  --wind-ok:#26A69A;--wind-warn:#FF8F00;--wind-bad:#FF5252;
+  --shadow-sm:0 2px 8px rgba(33,150,243,0.12);
+  --shadow-md:0 4px 20px rgba(33,150,243,0.18);
+  --shadow-lg:0 8px 40px rgba(33,150,243,0.22);
+  --radius:16px;--radius-sm:10px;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+body{font-family:'Noto Sans KR',sans-serif;background:var(--sky);color:var(--gray-800);overflow:hidden;height:100dvh;display:flex;flex-direction:column;}
+
+#topbar{background:linear-gradient(135deg,#1565C0 0%,#0288D1 55%,#00ACC1 100%);padding:10px 14px 8px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 2px 12px rgba(13,71,161,0.3);flex-shrink:0;z-index:1000;}
+.logo{display:flex;align-items:center;gap:8px;}
+.logo-icon{font-size:20px;}
+.logo-text{font-family:'Montserrat',sans-serif;font-weight:800;font-size:15px;color:white;line-height:1.15;}
+.logo-sub{font-size:8.5px;color:rgba(255,255,255,0.65);font-weight:300;letter-spacing:1.5px;text-transform:uppercase;}
+.top-actions{display:flex;gap:5px;}
+.top-btn{background:rgba(255,255,255,0.18);border:none;border-radius:9px;color:white;padding:6px 10px;font-size:11.5px;font-family:'Noto Sans KR',sans-serif;cursor:pointer;transition:all 0.2s;display:flex;align-items:center;gap:3px;white-space:nowrap;}
+.top-btn:hover{background:rgba(255,255,255,0.32);}
+
+/* REC BAR */
+#rec-bar{background:white;border-bottom:1.5px solid var(--gray-200);padding:5px 12px;display:flex;align-items:center;gap:7px;flex-shrink:0;overflow-x:auto;scrollbar-width:none;min-height:36px;}
+#rec-bar::-webkit-scrollbar{display:none;}
+.rec-label{font-size:10px;font-weight:700;color:var(--sea);white-space:nowrap;flex-shrink:0;}
+.rec-chip{background:var(--gray-100);border:1.5px solid var(--gray-200);border-radius:14px;padding:2px 9px;font-size:10.5px;white-space:nowrap;color:var(--gray-800);cursor:pointer;transition:all 0.2s;flex-shrink:0;}
+.rec-chip:hover{background:var(--sea);color:white;border-color:var(--sea);}
+.rec-chip.best{background:var(--coral);border-color:var(--coral);color:white;font-weight:700;}
+
+/* WEATHER STRIP - 5개만 */
+#weather-strip{background:linear-gradient(90deg,#E3F2FD,#E0F7FA);border-bottom:1px solid rgba(33,150,243,0.12);padding:5px 12px;display:flex;align-items:center;gap:10px;flex-shrink:0;overflow-x:auto;scrollbar-width:none;}
+#weather-strip::-webkit-scrollbar{display:none;}
+.wx-item{display:flex;align-items:center;gap:4px;white-space:nowrap;flex-shrink:0;}
+.wx-icon{font-size:14px;}
+.wx-val{font-size:12px;font-weight:700;color:var(--gray-800);}
+.wx-lbl{font-size:9.5px;color:var(--gray-400);}
+.wx-divider{width:1px;height:16px;background:var(--gray-200);flex-shrink:0;}
+.wx-loc{font-size:10px;color:var(--sea);font-weight:600;white-space:nowrap;flex-shrink:0;}
+.wind-ok{color:var(--wind-ok)!important;}
+.wind-warn{color:var(--wind-warn)!important;}
+.wind-bad{color:var(--wind-bad)!important;}
+
+/* MONTHLY FISH BAR */
+#fish-bar{background:white;border-bottom:1.5px solid var(--gray-200);padding:5px 12px;display:flex;align-items:center;gap:6px;flex-shrink:0;overflow-x:auto;scrollbar-width:none;min-height:34px;}
+#fish-bar::-webkit-scrollbar{display:none;}
+.fish-bar-lbl{font-size:10px;font-weight:700;color:var(--coral);white-space:nowrap;flex-shrink:0;}
+.fish-chip{background:var(--mint-light);border:1.5px solid rgba(0,188,212,0.3);border-radius:12px;padding:2px 9px;font-size:10px;white-space:nowrap;color:var(--success);cursor:pointer;transition:all 0.2s;flex-shrink:0;font-weight:600;}
+.fish-chip:hover,.fish-chip.active{background:var(--mint);color:white;border-color:var(--mint);}
+.fish-chip.peak{background:var(--coral);border-color:var(--coral);color:white;}
+.fish-chip.priority{border-width:2px;border-color:var(--sea);}
+.fish-chip.priority.peak{border-color:var(--hot);}
+
+#map{flex:1;z-index:1;}
+#map .leaflet-popup-content-wrapper{border-radius:var(--radius-sm);box-shadow:var(--shadow-md);border:none;padding:0;}
+#map .leaflet-popup-content{margin:0;}
+#map .leaflet-popup-tip-container{display:none;}
+
+#nav{background:white;border-top:1px solid var(--gray-200);display:flex;flex-shrink:0;z-index:1000;box-shadow:0 -4px 20px rgba(0,0,0,0.06);}
+.nav-tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 4px 10px;border:none;background:transparent;cursor:pointer;color:var(--gray-400);font-family:'Noto Sans KR',sans-serif;transition:all 0.2s;}
+.nav-tab.active{color:var(--sea);}
+.nav-tab .tab-icon{font-size:19px;}
+.nav-tab .tab-label{font-size:9.5px;font-weight:500;}
+.nav-tab.active .tab-label{font-weight:700;}
+
+/* MINI POPUP */
+.mini-popup{background:white;border-radius:14px;overflow:hidden;box-shadow:0 8px 30px rgba(0,0,0,0.15);width:248px;font-family:'Noto Sans KR',sans-serif;}
+.mini-popup-header{padding:11px 13px 9px;background:linear-gradient(135deg,#1565C0,#0288D1);color:white;}
+.mini-popup-name{font-size:14px;font-weight:700;}
+.mini-popup-region{font-size:10px;opacity:0.75;margin-top:2px;}
+.mini-popup-body{padding:9px 13px 11px;}
+.mini-stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;margin-bottom:9px;}
+.mini-stat{background:var(--gray-100);border-radius:7px;padding:5px 7px;}
+.mini-stat-lbl{font-size:8.5px;color:var(--gray-400);font-weight:500;}
+.mini-stat-val{font-size:12px;font-weight:700;color:var(--gray-800);margin-top:1px;}
+.mini-fish{display:flex;flex-wrap:wrap;gap:3px;margin-bottom:9px;}
+.mini-fish-tag{background:var(--mint-light);color:var(--mint);border-radius:5px;padding:2px 7px;font-size:9.5px;font-weight:600;}
+.mini-fish-tag.off{background:var(--gray-100);color:var(--gray-400);}
+.mini-fish-tag.peak{background:var(--hot);color:white;}
+.mini-detail-btn{width:100%;background:var(--sea);color:white;border:none;border-radius:7px;padding:8px;font-size:11.5px;font-weight:700;font-family:'Noto Sans KR',sans-serif;cursor:pointer;}
+
+/* DRAWER */
+#drawer{position:fixed;bottom:0;left:0;right:0;background:white;border-radius:22px 22px 0 0;box-shadow:0 -8px 40px rgba(0,0,0,0.15);z-index:2000;transform:translateY(100%);transition:transform 0.35s cubic-bezier(0.34,1.4,0.64,1);max-height:88vh;display:flex;flex-direction:column;}
+#drawer.open{transform:translateY(0);}
+.drawer-handle{width:38px;height:4px;background:var(--gray-200);border-radius:2px;margin:10px auto 0;flex-shrink:0;}
+.drawer-header{padding:14px 18px 12px;background:linear-gradient(135deg,#1565C0 0%,#0288D1 100%);flex-shrink:0;position:relative;}
+.drawer-name{font-size:19px;font-weight:900;color:white;padding-right:36px;}
+.drawer-meta{font-size:11px;color:rgba(255,255,255,0.75);margin-top:4px;display:flex;align-items:center;gap:7px;flex-wrap:wrap;}
+.drawer-badge{background:rgba(255,255,255,0.22);padding:2px 9px;border-radius:9px;font-size:10px;font-weight:600;}
+.drawer-close{position:absolute;top:14px;right:14px;background:rgba(255,255,255,0.22);border:none;color:white;width:30px;height:30px;border-radius:50%;cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center;}
+.drawer-body{overflow-y:auto;flex:1;padding:14px 18px 80px;-webkit-overflow-scrolling:touch;}
+.d-section{margin-bottom:18px;}
+.d-section-title{font-size:11.5px;font-weight:700;color:var(--gray-400);text-transform:uppercase;letter-spacing:0.7px;margin-bottom:9px;display:flex;align-items:center;gap:6px;}
+.d-section-title::after{content:'';flex:1;height:1px;background:var(--gray-200);}
+
+/* WEATHER IN DRAWER */
+.wx-cards-4{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-bottom:8px;}
+.wx-card{background:var(--gray-100);border-radius:var(--radius-sm);padding:9px 7px;text-align:center;}
+.wx-card-icon{font-size:18px;margin-bottom:3px;}
+.wx-card-val{font-size:13px;font-weight:700;color:var(--gray-800);}
+.wx-card-lbl{font-size:9px;color:var(--gray-400);margin-top:1px;}
+.wind-row{display:flex;align-items:center;gap:10px;background:var(--gray-100);border-radius:var(--radius-sm);padding:10px 14px;}
+.wind-val-big{font-size:26px;font-weight:900;line-height:1;}
+.wind-unit{font-size:11px;color:var(--gray-600);}
+.wind-desc-txt{font-size:12px;font-weight:700;margin-top:3px;}
+.wind-dir-txt{font-size:10px;color:var(--gray-400);margin-top:2px;}
+.wind-cond-badge{margin-left:auto;text-align:center;}
+.wind-cond-icon{font-size:28px;display:block;}
+.wind-cond-lbl{font-size:10px;font-weight:700;margin-top:2px;}
+
+/* DEPTH & POINT INFO */
+.depth-wrap{background:linear-gradient(135deg,#E3F2FD,#E0F7FA);border-radius:var(--radius-sm);padding:12px;margin-bottom:10px;}
+.depth-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:8px;}
+.depth-item{background:white;border-radius:8px;padding:8px 6px;text-align:center;box-shadow:var(--shadow-sm);}
+.depth-icon{font-size:16px;margin-bottom:3px;}
+.depth-lbl{font-size:9px;color:var(--gray-400);font-weight:600;}
+.depth-val{font-size:13px;font-weight:700;color:var(--sea-deep);}
+.spot-tags{display:flex;flex-wrap:wrap;gap:5px;}
+.spot-tag{background:white;border:1.5px solid var(--sea-light);color:var(--sea-deep);border-radius:7px;padding:3px 9px;font-size:10.5px;font-weight:600;}
+.spot-tag.hot{border-color:var(--hot);color:var(--hot);background:#fff5f5;}
+.point-info-txt{background:var(--gray-100);border-radius:var(--radius-sm);padding:12px;font-size:12.5px;color:var(--gray-600);line-height:1.75;}
+
+/* TIDE TIMELINE - 새 디자인 */
+.tide-wrap{background:linear-gradient(160deg,#0d1f3c 0%,#0d3360 100%);border-radius:14px;padding:14px 16px;color:white;}
+.tide-summary-row{display:flex;align-items:center;gap:10px;margin-bottom:14px;}
+.tide-summary-left{min-width:56px;}
+.tide-name-big{font-size:22px;font-weight:900;color:white;line-height:1;}
+.tide-lunar{font-size:10px;color:rgba(255,255,255,0.55);margin-top:3px;}
+.tide-current-bar-wrap{flex:1;}
+.tide-current-track{height:8px;background:rgba(255,255,255,0.15);border-radius:4px;overflow:hidden;margin-bottom:4px;}
+.tide-current-fill{height:100%;border-radius:4px;background:linear-gradient(90deg,#42A5F5,#00E5FF);transition:width 0.5s ease;}
+.tide-current-labels{display:flex;justify-content:space-between;font-size:8.5px;color:rgba(255,255,255,0.45);}
+.tide-summary-right{text-align:right;min-width:52px;}
+.tide-pct-big{font-size:22px;font-weight:900;color:#00E5FF;line-height:1;}
+.tide-pct-lbl{font-size:9px;color:rgba(255,255,255,0.5);margin-top:3px;}
+.sun-timeline-wrap{margin-bottom:10px;}
+.sun-tl-label-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;}
+.sun-lbl{font-size:10.5px;font-weight:700;color:rgba(255,255,255,0.8);}
+.sun-now-lbl{font-size:9px;color:#FFD54F;font-weight:700;}
+/* 기존 tide-meta 호환 (사용 안하지만 남겨둠) */
+.tide-name{font-size:16px;font-weight:900;color:var(--gray-800);}
+.tide-sub{font-size:10px;color:var(--gray-600);margin-top:2px;}
+.tide-pct{font-size:22px;font-weight:900;text-align:right;}
+.tide-pct-lbl{font-size:9px;color:var(--gray-600);text-align:right;}
+.tl-bar{height:32px;border-radius:16px;background:linear-gradient(90deg,#0d1b2a 0%,#1a3a5c 10%,#1565C0 25%,#42A5F5 45%,#FFD54F 50%,#42A5F5 55%,#1565C0 75%,#0d2137 90%,#0d1b2a 100%);position:relative;overflow:hidden;margin:6px 0;}
+.tl-sun-zone{position:absolute;top:0;height:100%;background:rgba(255,213,79,0.2);}
+.tl-now{position:absolute;top:-3px;bottom:-3px;width:3px;background:white;border-radius:2px;box-shadow:0 0 8px rgba(255,255,255,0.9);z-index:4;}
+.tl-tide-marker{position:absolute;top:50%;transform:translate(-50%,-50%);z-index:3;text-align:center;}
+.tl-dot{width:9px;height:9px;border-radius:50%;border:2px solid white;margin:0 auto;}
+.tl-dot.high{background:#00BCD4;}.tl-dot.low{background:#FFE082;}
+.tl-tide-lbl{font-size:7.5px;color:white;font-weight:700;margin-top:1px;text-shadow:0 1px 3px rgba(0,0,0,0.9);}
+.tl-sun-marker{position:absolute;top:50%;transform:translate(-50%,-50%);font-size:16px;z-index:3;filter:drop-shadow(0 1px 3px rgba(0,0,0,0.6));}
+.tl-hours{display:flex;justify-content:space-between;padding:0 2px;}
+.tl-h{font-size:8.5px;color:var(--gray-400);}
+.tide-detail-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-top:10px;}
+.tide-detail-item{background:white;border-radius:8px;padding:7px 5px;text-align:center;}
+.tdi-type{font-size:8px;color:var(--gray-400);font-weight:600;}
+.tdi-time{font-size:13px;font-weight:700;color:var(--gray-800);margin:2px 0;}
+.tdi-h{font-size:10px;font-weight:600;}
+.tdi-h.high{color:var(--mint);}.tdi-h.low{color:var(--sea-light);}
+
+/* FISH GRID */
+.fish-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.fish-card{background:white;border:1.5px solid var(--gray-200);border-radius:var(--radius-sm);padding:11px;}
+.fish-card.season-on{border-color:var(--mint);background:#f0fdfb;}
+.fish-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:5px;}
+.fish-name{font-size:13px;font-weight:700;}
+.fish-badge{font-size:8.5px;padding:2px 6px;border-radius:5px;font-weight:700;flex-shrink:0;}
+.fish-badge.peak{background:var(--hot);color:white;}
+.fish-badge.on{background:var(--success);color:white;}
+.fish-badge.off{background:var(--gray-200);color:var(--gray-400);}
+.fish-seatemp{display:inline-flex;align-items:center;background:#E3F2FD;border-radius:5px;padding:2px 7px;font-size:9.5px;color:#1565C0;font-weight:600;margin-bottom:5px;}
+.fish-info{font-size:10.5px;color:var(--gray-600);line-height:1.5;margin-bottom:5px;}
+.season-cal{display:flex;gap:2px;margin-bottom:5px;}
+.s-m{flex:1;display:flex;flex-direction:column;align-items:center;}
+.s-m-lbl{font-size:7.5px;color:var(--gray-400);margin-bottom:2px;}
+.s-block{width:100%;height:6px;border-radius:2px;background:var(--gray-200);}
+.s-block.on{background:var(--success);}.s-block.peak{background:var(--hot);}
+.tackle-tags{display:flex;flex-wrap:wrap;gap:3px;}
+.tackle-tag{background:var(--sand);color:var(--warning);font-size:9px;padding:2px 6px;border-radius:4px;font-weight:600;}
+
+/* PANELS */
+#recommend-panel,#record-panel{position:fixed;bottom:0;left:0;right:0;top:0;background:var(--gray-100);z-index:1500;display:none;flex-direction:column;}
+#recommend-panel.open,#record-panel.open{display:flex;}
+.panel-header{background:linear-gradient(135deg,#1565C0,#0288D1);padding:14px 18px;display:flex;align-items:center;justify-content:space-between;padding-top:max(14px,env(safe-area-inset-top));}
+.panel-title{font-size:17px;font-weight:700;color:white;}
+.panel-close{background:rgba(255,255,255,0.22);border:none;color:white;width:30px;height:30px;border-radius:50%;cursor:pointer;font-size:17px;display:flex;align-items:center;justify-content:center;}
+.panel-body{flex:1;overflow-y:auto;padding:14px;-webkit-overflow-scrolling:touch;}
+
+.rec-spot-card{background:white;border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow-md);margin-bottom:11px;cursor:pointer;transition:transform 0.2s;border:2px solid transparent;}
+.rec-spot-card:hover{transform:translateY(-2px);}
+.rec-spot-card.rank-1{border-color:var(--coral);}.rec-spot-card.rank-2{border-color:var(--sea-light);}
+.rec-spot-card.nogo{opacity:0.4;pointer-events:none;}
+.rsc-header{padding:12px 14px;background:linear-gradient(135deg,#1565C0,#0288D1);display:flex;align-items:center;gap:10px;}
+.rsc-rank{font-family:'Montserrat',sans-serif;font-size:26px;font-weight:800;color:rgba(255,255,255,0.25);min-width:34px;}
+.rsc-name{font-size:15px;font-weight:700;color:white;}
+.rsc-region{font-size:10px;color:rgba(255,255,255,0.7);margin-top:1px;}
+.rsc-score-row{display:flex;align-items:center;gap:5px;margin-top:5px;}
+.rec-tab-wrap{display:flex;gap:6px;}
+.rec-tab{background:rgba(255,255,255,0.18);border:none;color:rgba(255,255,255,0.75);padding:7px 16px;border-radius:20px 20px 0 0;font-size:13px;font-weight:600;cursor:pointer;transition:all 0.2s;}
+.rec-tab.active{background:var(--gray-100);color:var(--gray-800);}
+.wk-day-card{background:white;border-radius:12px;margin-bottom:8px;overflow:hidden;}
+.wk-day-header{background:linear-gradient(135deg,#1976D2,#42A5F5);padding:10px 14px;display:flex;align-items:center;gap:8px;}
+.wk-day-label{font-size:14px;font-weight:800;color:white;}
+.wk-day-tide{font-size:11px;color:rgba(255,255,255,0.8);margin-left:auto;}
+.wk-best-label{font-size:10px;color:rgba(255,255,255,0.7);padding:6px 14px 2px;font-weight:600;}
+.rsc-track{flex:1;height:4px;background:rgba(255,255,255,0.25);border-radius:2px;}
+.rsc-fill{height:100%;background:var(--sand-dark);border-radius:2px;}
+.rsc-val{font-size:11px;color:white;font-weight:700;}
+.rsc-wind{font-size:9.5px;padding:2px 7px;border-radius:7px;font-weight:700;margin-left:4px;}
+.rsc-wind.ok{background:rgba(38,166,154,0.35);color:#80cbc4;}
+.rsc-wind.warn{background:rgba(255,143,0,0.35);color:#ffcc80;}
+.rsc-wind.bad{background:rgba(255,82,82,0.35);color:#ff8a80;}
+.rsc-body{padding:10px 14px 12px;}
+.rsc-why{font-size:11.5px;color:var(--gray-600);line-height:1.6;margin-bottom:8px;}
+.rsc-fish{display:flex;flex-wrap:wrap;gap:4px;}
+.rsc-fish-tag{background:var(--mint-light);color:var(--success);border-radius:6px;padding:3px 9px;font-size:10.5px;font-weight:700;}
+
+/* FORM */
+.form-card{background:white;border-radius:var(--radius);padding:14px;margin-bottom:12px;box-shadow:var(--shadow-sm);}
+.form-group{margin-bottom:11px;}
+.form-label{font-size:11px;font-weight:700;color:var(--gray-600);margin-bottom:5px;display:block;}
+.form-input{width:100%;border:1.5px solid var(--gray-200);border-radius:var(--radius-sm);padding:9px 11px;font-size:13.5px;font-family:'Noto Sans KR',sans-serif;color:var(--gray-800);outline:none;background:white;transition:border-color 0.2s;}
+.form-input:focus{border-color:var(--sea);}
+.form-select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%239BA5B0' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 11px center;padding-right:30px;}
+.form-textarea{resize:none;height:72px;}
+.save-btn{width:100%;background:linear-gradient(135deg,var(--sea),var(--mint));border:none;color:white;border-radius:var(--radius-sm);padding:13px;font-size:14px;font-weight:700;font-family:'Noto Sans KR',sans-serif;cursor:pointer;box-shadow:var(--shadow-md);}
+.record-card{background:white;border-radius:var(--radius);padding:12px 14px;margin-bottom:9px;box-shadow:var(--shadow-sm);display:flex;gap:11px;position:relative;}
+.rcd-badge{background:var(--sea);color:white;border-radius:var(--radius-sm);padding:7px 9px;text-align:center;flex-shrink:0;min-width:44px;}
+.rcd-m{font-size:9px;font-weight:600;}.rcd-d{font-size:18px;font-weight:900;line-height:1;}
+.rcd-info{flex:1;}
+.rcd-spot{font-size:13px;font-weight:700;}
+.rcd-catch{font-size:11px;color:var(--mint);font-weight:600;margin-top:2px;}
+.rcd-memo{font-size:11px;color:var(--gray-400);margin-top:3px;line-height:1.4;}
+.rcd-del{position:absolute;top:10px;right:10px;background:none;border:none;color:var(--gray-400);cursor:pointer;font-size:15px;padding:4px;}
+
+#fab{position:fixed;bottom:72px;right:14px;width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,var(--coral),#FF8A65);border:none;color:white;font-size:20px;box-shadow:0 4px 18px rgba(255,112,67,0.4);cursor:pointer;z-index:999;transition:all 0.2s;display:flex;align-items:center;justify-content:center;}
+#fab:hover{transform:scale(1.1);}
+#fab.cancel{background:linear-gradient(135deg,var(--gray-600),var(--gray-800));}
+#overlay{position:fixed;inset:0;background:rgba(0,0,0,0.42);z-index:1999;display:none;}
+#overlay.show{display:block;}
+#month-modal{position:fixed;inset:0;z-index:3000;background:rgba(0,0,0,0.5);display:none;align-items:center;justify-content:center;}
+#month-modal.open{display:flex;}
+.mm-box{background:white;border-radius:18px;padding:18px;width:270px;box-shadow:var(--shadow-lg);}
+.mm-title{font-size:15px;font-weight:700;text-align:center;margin-bottom:14px;}
+.mm-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;}
+.mm-btn{background:var(--gray-100);border:2px solid transparent;border-radius:var(--radius-sm);padding:9px 4px;text-align:center;font-size:12.5px;font-weight:600;font-family:'Noto Sans KR',sans-serif;cursor:pointer;color:var(--gray-800);transition:all 0.2s;}
+.mm-btn:hover,.mm-btn.active{background:var(--sea);color:white;border-color:var(--sea);}
+.mm-close{width:100%;margin-top:10px;background:var(--gray-100);border:none;border-radius:var(--radius-sm);padding:9px;font-size:13px;font-family:'Noto Sans KR',sans-serif;cursor:pointer;color:var(--gray-600);font-weight:600;}
+#search-box{position:fixed;top:58px;left:14px;right:14px;background:white;border-radius:var(--radius);box-shadow:var(--shadow-lg);z-index:2000;display:none;overflow:hidden;}
+#search-box.open{display:block;}
+#search-input{width:100%;border:none;padding:13px 15px;font-size:14px;font-family:'Noto Sans KR',sans-serif;outline:none;}
+#search-results{max-height:280px;overflow-y:auto;}
+.si{padding:11px 15px;border-top:1px solid var(--gray-200);cursor:pointer;display:flex;align-items:center;gap:9px;}
+.si:hover{background:var(--gray-100);}
+.si-name{font-size:13px;font-weight:600;}
+.si-sub{font-size:11px;color:var(--gray-400);}
+#snackbar{position:fixed;bottom:82px;left:50%;transform:translateX(-50%) translateY(16px);background:var(--gray-800);color:white;padding:9px 18px;border-radius:18px;font-size:12.5px;z-index:9999;opacity:0;transition:all 0.3s;white-space:nowrap;}
+#snackbar.show{opacity:1;transform:translateX(-50%) translateY(0);}
+.empty-state{text-align:center;padding:36px 20px;}
+.empty-icon{font-size:44px;margin-bottom:10px;}
+.empty-text{font-size:13px;color:var(--gray-400);line-height:1.6;}
+@media(max-width:380px){.wx-cards-4{grid-template-columns:repeat(2,1fr)}.fish-grid{grid-template-columns:1fr}.tide-detail-grid{grid-template-columns:1fr 1fr}.depth-grid{grid-template-columns:repeat(2,1fr)}}
+::-webkit-scrollbar{width:3px;}::-webkit-scrollbar-thumb{background:var(--gray-200);border-radius:2px;}
+</style>
+</head>
+<body>
+
+<div id="topbar">
+  <div class="logo"><span class="logo-icon">🎣</span><div><div class="logo-text">Today Fishing Point</div><div class="logo-sub">투데이 피싱포인트</div></div></div>
+  <div class="top-actions">
+    <button class="top-btn" onclick="openMonthModal()">📅 <span id="month-label">1월</span></button>
+    <button class="top-btn" onclick="toggleSearch()">🔍</button>
+    <button class="top-btn" onclick="openRecommendPanel()">⭐ 추천</button>
+  </div>
+</div>
+
+<div id="rec-bar">
+  <div class="rec-label">🎯 오늘의 추천지</div>
+  <span id="rec-loading" style="font-size:10px;color:var(--gray-400);">날씨 확인중...</span>
+  <div id="rec-chips" style="display:flex;gap:6px;"></div>
+</div>
+
+<!-- 날씨 스트립: 날씨/기온/바람/파고/수온 5개만 -->
+<div id="weather-strip">
+  <span class="wx-loc" id="ws-loc">📍 위치확인중</span>
+  <div class="wx-divider"></div>
+  <div class="wx-item"><span class="wx-icon">🌤</span><span class="wx-val" id="ws-weather">--</span><span class="wx-lbl">날씨</span></div>
+  <div class="wx-divider"></div>
+  <div class="wx-item"><span class="wx-icon">🌡</span><span class="wx-val" id="ws-temp">--°C</span><span class="wx-lbl">기온</span></div>
+  <div class="wx-divider"></div>
+  <div class="wx-item"><span class="wx-icon">💨</span><span class="wx-val" id="ws-wind">--</span><span class="wx-lbl">바람</span></div>
+  <div class="wx-divider"></div>
+  <div class="wx-item"><span class="wx-icon">🌊</span><span class="wx-val" id="ws-wave">--m</span><span class="wx-lbl">파고</span></div>
+  <div class="wx-divider"></div>
+  <div class="wx-item"><span class="wx-icon">🌡</span><span class="wx-val" id="ws-seatemp">--°C</span><span class="wx-lbl">수온</span></div>
+</div>
+
+<!-- 월별 어종 바 -->
+<div id="fish-bar">
+  <div class="fish-bar-lbl">🐟 <span id="fish-bar-month">1월</span> 어종</div>
+  <div id="fish-chips" style="display:flex;gap:6px;"></div>
+</div>
+
+<div id="map"></div>
+
+<div id="nav">
+  <button class="nav-tab active" id="tab-map" onclick="showMap()"><span class="tab-icon">🗺️</span><span class="tab-label">포인트</span></button>
+  <button class="nav-tab" id="tab-record" onclick="openRecordPanel()"><span class="tab-icon">📔</span><span class="tab-label">내 기록</span></button>
+  <button class="nav-tab" id="install-btn" onclick="installApp()" style="display:none;"><span class="tab-icon">📲</span><span class="tab-label">앱설치</span></button>
+</div>
+
+<button id="fab" onclick="toggleAddPoint()">📌</button>
+<div id="overlay" onclick="closeDrawer()"></div>
+
+<div id="drawer">
+  <div class="drawer-handle"></div>
+  <div class="drawer-header">
+    <div class="drawer-name" id="d-name">--</div>
+    <div class="drawer-meta"><span id="d-region" class="drawer-badge">--</span><span id="d-type-badge" class="drawer-badge">--</span></div>
+    <button class="drawer-close" onclick="closeDrawer()">✕</button>
+  </div>
+  <div class="drawer-body">
+    <!-- 1. 날씨 -->
+    <div class="d-section">
+      <div class="d-section-title">🌤 현재 날씨</div>
+      <div class="wx-cards-4">
+        <div class="wx-card"><div class="wx-card-icon">☁️</div><div class="wx-card-val" id="d-sky">--</div><div class="wx-card-lbl">날씨</div></div>
+        <div class="wx-card"><div class="wx-card-icon">🌡</div><div class="wx-card-val" id="d-temp">--</div><div class="wx-card-lbl">기온</div></div>
+        <div class="wx-card"><div class="wx-card-icon">🌊</div><div class="wx-card-val" id="d-wave">--</div><div class="wx-card-lbl">파고</div></div>
+        <div class="wx-card"><div class="wx-card-icon">🌡</div><div class="wx-card-val" id="d-seatemp">--</div><div class="wx-card-lbl">수온</div></div>
+      </div>
+      <div class="wind-row">
+        <div style="font-size:22px;">💨</div>
+        <div style="flex:1;">
+          <div style="display:flex;align-items:baseline;gap:4px;">
+            <span class="wind-val-big" id="d-wind-val">--</span>
+            <span class="wind-unit">m/s</span>
+          </div>
+          <div class="wind-desc-txt" id="d-wind-desc">--</div>
+          <div class="wind-dir-txt" id="d-wind-dir"></div>
+        </div>
+        <div class="wind-cond-badge">
+          <span class="wind-cond-icon" id="d-wind-icon">--</span>
+          <div class="wind-cond-lbl" id="d-wind-cond-lbl">--</div>
+        </div>
+      </div>
+    </div>
+    <!-- 2. 물때 타임라인 -->
+    <div class="d-section">
+      <div class="d-section-title">🌊 물때 & 조류</div>
+      <div class="tide-wrap">
+        <!-- 물때 상단 요약 -->
+        <div class="tide-summary-row">
+          <div class="tide-summary-left">
+            <div class="tide-name-big" id="d-tide-name">--물</div>
+            <div class="tide-lunar" id="d-tide-sub">음력 --일</div>
+          </div>
+          <div class="tide-current-bar-wrap">
+            <div class="tide-current-track">
+              <div class="tide-current-fill" id="d-tide-fill"></div>
+            </div>
+            <div class="tide-current-labels">
+              <span>조금</span><span>사리</span>
+            </div>
+          </div>
+          <div class="tide-summary-right">
+            <div class="tide-pct-big" id="d-tide-pct">--%</div>
+            <div class="tide-pct-lbl">조류 세기</div>
+          </div>
+        </div>
+        <!-- 일출/일몰 + 현재시각 타임라인 -->
+        <div class="sun-timeline-wrap">
+          <div class="sun-tl-label-row">
+            <span class="sun-lbl" id="d-sunrise-lbl">☀️ --:--</span>
+            <span class="sun-now-lbl" id="d-now-lbl">▼ 지금</span>
+            <span class="sun-lbl" id="d-sunset-lbl">🌙 --:--</span>
+          </div>
+          <div class="tl-bar" id="tl-bar">
+            <div class="tl-sun-zone" id="tl-sun-zone"></div>
+            <div class="tl-now" id="tl-now"></div>
+          </div>
+          <div class="tl-hours"><span class="tl-h">0시</span><span class="tl-h">6시</span><span class="tl-h">12시</span><span class="tl-h">18시</span><span class="tl-h">24시</span></div>
+        </div>
+        <!-- 간조/만조 카드 -->
+        <div class="tide-detail-grid" id="tide-detail-grid"></div>
+      </div>
+    </div>
+    <!-- 3. 포인트 특징 -->
+    <div class="d-section">
+      <div class="d-section-title">📍 포인트 특징</div>
+      <div class="depth-wrap">
+        <div class="depth-grid" id="d-depth-grid"></div>
+        <div class="spot-tags" id="d-spot-tags"></div>
+      </div>
+      <div class="point-info-txt" id="d-info"></div>
+    </div>
+    <!-- 4. 어종 -->
+    <div class="d-section">
+      <div class="d-section-title">🐟 어종 정보</div>
+      <div class="fish-grid" id="d-fish-grid"></div>
+    </div>
+    <!-- 태그 -->
+    <div class="d-section">
+      <div class="d-section-title">🏷️ 태그</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;" id="d-tags"></div>
+    </div>
+  </div>
+</div>
+
+<div id="search-box">
+  <input type="text" id="search-input" placeholder="포인트·어종·지역 검색..." oninput="doSearch(this.value)">
+  <div id="search-results"></div>
+</div>
+
+<div id="month-modal">
+  <div class="mm-box">
+    <div class="mm-title">📅 월 선택</div>
+    <div class="mm-grid" id="month-grid"></div>
+    <button class="mm-close" onclick="closeMonthModal()">닫기</button>
+  </div>
+</div>
+
+<div id="record-panel">
+  <div class="panel-header"><div class="panel-title">📔 내 낚시 기록</div><button class="panel-close" onclick="closeRecordPanel()">✕</button></div>
+  <div class="panel-body">
+    <div class="form-card">
+      <div class="form-group"><label class="form-label">📅 날짜</label><input type="date" class="form-input" id="rec-date"></div>
+      <div class="form-group"><label class="form-label">📍 포인트</label><select class="form-input form-select" id="rec-spot"><option value="">선택</option></select></div>
+      <div class="form-group"><label class="form-label">🐟 어획</label><input type="text" class="form-input" id="rec-catch" placeholder="예: 감성돔 2마리, 볼락 5마리"></div>
+      <div class="form-group"><label class="form-label">📝 메모</label><textarea class="form-input form-textarea" id="rec-memo" placeholder="날씨, 물때, 채비, 느낀점..."></textarea></div>
+      <button class="save-btn" onclick="saveRecord()">💾 기록 저장</button>
+    </div>
+    <div id="record-list"></div>
+  </div>
+</div>
+
+<div id="recommend-panel">
+  <div class="panel-header" style="padding-bottom:0;">
+    <div style="display:flex;align-items:center;gap:10px;width:100%;">
+      <div class="rec-tab-wrap" style="display:flex;gap:6px;flex:1;">
+        <button class="rec-tab active" id="rec-tab-today" onclick="switchRecTab('today')">⭐ 오늘 추천</button>
+        <button class="rec-tab" id="rec-tab-weekend" onclick="switchRecTab('weekend')">📅 주말 추천</button>
+      </div>
+      <button class="panel-close" onclick="closeRecommendPanel()">✕</button>
+    </div>
+  </div>
+  <div class="panel-body" id="recommend-body"></div>
+</div>
+
+<div id="snackbar"></div>
+
+<script>
+// ════════════════════════════════════════
+// FISH DATABASE - 확장판
+// ════════════════════════════════════════
+const FISH_DB = {
+  // ── 보마스 주력 어종 (앞으로 배치) ──
+  '농어':{emoji:'🐟',habitat:'서프/방파제/갯바위',depth:'0~15m',
+    season:[0,0,0,1,1,2,2,2,1,1,0,0],peak:[5,6,7,8,9],
+    seaW:[0,0,0,0,1,2,2,2,1,1,0,0], seaS:[0,0,1,1,1,2,2,2,2,1,0,0], seaE:[0,0,0,0,1,2,1,1,1,1,0,0],
+    tackle:['미노우 루어','플러깅','바이브레이션'],
+    tips:'파도치는 날 서프 새벽·해질녘 최고. 강하구 기수역도 포인트. 13°C 이하 연안 이탈.',
+    seaTemp:{opt:'18~25°C',pos:'13~28°C',limit:'하한 13°C'}},
+
+  '광어':{emoji:'🐟',habitat:'모래/갯바위 주변',depth:'10~60m',
+    season:[0,0,0,1,2,1,0,0,2,2,1,0],peak:[4,5,8,9,10],
+    seaW:[0,0,0,1,2,2,1,0,1,2,1,0], seaS:[0,0,0,1,2,1,0,0,1,2,1,0], seaE:[0,0,0,1,1,1,0,0,2,2,1,0],
+    tackle:['지그헤드 서프 루어','다운샷 리그'],
+    tips:'모래+암반 경계 지점이 핵심. 일출·일몰 전후 1시간 피딩타임. 10°C 이하 활동 급감.',
+    seaTemp:{opt:'15~20°C',pos:'10~25°C',limit:'하한 10°C'}},
+
+  '우럭':{emoji:'🐟',habitat:'암초/방파제',depth:'10~40m',
+    season:[1,1,1,2,2,1,1,1,2,2,1,1],peak:[3,4,8,9],
+    seaW:[1,1,1,2,2,1,1,1,2,2,1,1], seaS:[1,1,1,2,1,1,1,0,1,2,1,1], seaE:[1,1,1,2,1,1,1,1,1,2,1,1],
+    tackle:['지그헤드 루어(웜)','원투낚시'],
+    tips:'연중 가능. 서해 최대표. 낮엔 바닥 암초, 야간엔 중층으로 떠오름. 조금 물때 조과 좋음.',
+    seaTemp:{opt:'12~20°C',pos:'7~24°C',limit:'하한 7°C'}},
+
+  '조기':{emoji:'🐟',habitat:'서해 중층',depth:'20~80m',
+    season:[0,0,2,2,1,0,0,0,0,0,0,0],peak:[2,3],
+    seaW:[0,0,2,2,1,0,0,0,0,0,0,0], seaS:[0,0,0,0,0,0,0,0,0,0,0,0], seaE:[0,0,0,0,0,0,0,0,0,0,0,0],
+    tackle:['찌낚시','루어','사비키'],
+    tips:'서해 봄 전용. 3~5월 연평도·군산 황금어장. 사리 물때 마릿수 폭발.',
+    seaTemp:{opt:'13~18°C',pos:'10~22°C',limit:'하한 10°C'}},
+
+  '백조기':{emoji:'🐟',habitat:'서해 연안/방파제',depth:'5~30m',
+    season:[0,0,0,0,0,1,2,2,1,0,0,0],peak:[6,7],
+    seaW:[0,0,0,0,0,1,2,2,1,0,0,0], seaS:[0,0,0,0,0,0,0,0,0,0,0,0], seaE:[0,0,0,0,0,0,0,0,0,0,0,0],
+    tackle:['찌낚시','루어','사비키'],
+    tips:'서해 여름 전용(6~9월). 참조기와 혼획됨. 6~8월 서해 방파제·갯바위 마릿수 낚시.',
+    seaTemp:{opt:'20~26°C',pos:'16~28°C',limit:'하한 16°C'}},
+
+  '갈치':{emoji:'🐠',habitat:'방파제/갯바위',depth:'10~80m',
+    season:[0,0,0,0,0,1,2,2,2,1,0,0],peak:[6,7,8,9],
+    seaW:[0,0,0,0,0,0,1,2,1,0,0,0], seaS:[0,0,0,0,0,1,2,2,2,1,0,0], seaE:[0,0,0,0,0,0,0,1,2,0,0,0],
+    tackle:['야간 찌낚시','루어(지그헤드)'],
+    tips:'야간 집어등 아래 찌낚시. 새벽 2~4시 입질 집중. 18°C 이하 연안 이탈. 남해 7~10월 피크.',
+    seaTemp:{opt:'22~28°C',pos:'18~30°C',limit:'하한 18°C'}},
+
+  '무늬오징어':{emoji:'🦑',habitat:'갯바위/방파제(남해·동해)',depth:'표층~20m',
+    season:[0,0,0,0,2,2,2,2,2,2,1,0],peak:[4,5,6,7,8,9],
+    seaW:[0,0,0,0,0,0,0,0,0,0,0,0], seaS:[0,0,0,0,2,2,2,2,2,2,1,0], seaE:[0,0,0,0,0,1,2,2,2,2,1,0],
+    tackle:['에깅(2.5~3.5호)'],
+    tips:'연안 에깅 전용. 5~7월 대물 시즌, 8~11월 마릿수 시즌. 낮=형광, 밤=야광 에기. 서해는 없음.',
+    seaTemp:{opt:'18~24°C',pos:'15~27°C',limit:'하한 15°C'}},
+
+  '갑오징어':{emoji:'🦑',habitat:'방파제/갯바위/서프',depth:'표층~15m',
+    season:[0,0,0,0,1,1,2,2,2,2,0,0],peak:[6,7,8,9],
+    seaW:[0,0,0,0,0,1,2,2,2,1,0,0], seaS:[0,0,0,0,1,2,2,2,2,2,0,0], seaE:[0,0,0,0,0,1,2,2,1,0,0,0],
+    tackle:['에깅','배낚시 채비'],
+    tips:'서해에서도 연안 에깅 가능. 남해 5월부터 시즌. 가을 마릿수 최고. 바닥층 느리게 공략.',
+    seaTemp:{opt:'18~26°C',pos:'15~28°C',limit:'하한 15°C'}},
+
+  '쭈꾸미':{emoji:'🐙',habitat:'서해·남해 갯벌/방파제',depth:'2~20m',
+    season:[0,0,0,0,0,0,0,1,2,2,0,0],peak:[8,9],
+    seaW:[0,0,0,0,0,0,0,1,2,2,0,0], seaS:[0,0,0,0,0,0,0,1,2,2,1,0], seaE:[0,0,0,0,0,0,0,0,0,0,0,0],
+    tackle:['쭈꾸미 에기','배낚시'],
+    tips:'서해·남해 가을 최고. 9~10월 피크. 산란 전후 얕은 곳으로 이동. 동해엔 없음.',
+    seaTemp:{opt:'19~24°C',pos:'16~26°C',limit:'하한 16°C'}},
+
+  '가자미':{emoji:'🐟',habitat:'모래바닥',depth:'5~40m',
+    season:[2,2,2,1,0,0,0,0,1,2,2,1],peak:[1,2,9,10,11],
+    seaW:[2,1,1,1,0,0,0,0,0,1,2,2], seaS:[1,1,2,1,0,0,0,0,0,1,1,1], seaE:[2,2,2,2,1,0,0,0,1,2,2,2],
+    tackle:['원투낚시(바닥채비)'],
+    tips:'동해 최대표 어종. 수온 낮을수록 활성 높음. 모래·자갈 해변 원투. 청갯지렁이 미끼.',
+    seaTemp:{opt:'8~16°C',pos:'5~20°C',limit:'상한 20°C'}},
+
+  '전어':{emoji:'🐟',habitat:'방파제/갯벌/연안',depth:'표층~10m',
+    season:[0,0,0,0,0,0,0,1,2,2,0,0],peak:[8,9],
+    seaW:[0,0,0,0,0,0,0,1,2,2,0,0], seaS:[0,0,0,0,0,0,0,1,2,2,0,0], seaE:[0,0,0,0,0,0,0,0,1,1,0,0],
+    tackle:['사비키','찌낚시'],
+    tips:'"봄 도다리 가을 전어". 9~10월 기름진 전어가 제철. 방파제 사비키 크릴 밑밥.',
+    seaTemp:{opt:'20~26°C',pos:'17~28°C',limit:'하한 17°C'}},
+
+  // ── 기타 어종 ──
+  '감성돔':{emoji:'🐟',habitat:'갯바위/방파제/여밭',depth:'5~30m',
+    season:[0,2,0,1,2,1,0,0,1,2,2,0],peak:[1,4,9,10],
+    seaW:[0,0,0,0,2,1,1,0,1,2,1,0], seaS:[1,2,0,1,2,1,1,1,1,2,2,1], seaE:[0,0,1,2,2,0,0,0,1,2,1,0],
+    tackle:['반유동·전유동 찌낚시'],
+    tips:'조류 흐르는 여밭. 남해 2월 영등철 대물 시즌. 남해 원도권은 겨울도 가능. 10°C 이하 연안 이탈.',
+    seaTemp:{opt:'15~22°C',pos:'10~25°C',limit:'하한 10°C'}},
+
+  '참돔':{emoji:'🐠',habitat:'암초/수중여/갯바위',depth:'10~50m',
+    season:[0,0,1,2,2,1,0,0,1,2,1,0],peak:[3,4,9],
+    seaW:[0,0,0,0,1,1,0,0,1,1,0,0], seaS:[0,0,1,2,2,1,0,0,1,2,1,0], seaE:[0,0,0,1,1,0,0,0,1,1,0,0],
+    tackle:['갯바위 찌낚시','타이라바'],
+    tips:'봄 산란기(4~5월) 갯바위 집결 피크. 조류 흐르는 수중여 포인트.',
+    seaTemp:{opt:'17~22°C',pos:'13~26°C',limit:'하한 13°C'}},
+
+  '볼락':{emoji:'🐡',habitat:'방파제/갯바위/암초',depth:'3~20m',
+    season:[2,1,2,2,1,0,0,0,0,0,1,2],peak:[0,2,3,11],
+    seaW:[0,0,0,0,0,0,0,0,0,0,0,0], seaS:[2,1,2,2,1,0,0,0,0,0,1,2], seaE:[1,1,2,2,1,0,0,0,0,0,2,2],
+    tackle:['지그헤드 루어(0.5~1.5g)','찌낚시'],
+    tips:'야간 집어등 아래 활성 최고. 남해 12~1월 야간 피크, 봄(3~4월) 대물 피크. 서해엔 거의 없음. 7~10월 비수기.',
+    seaTemp:{opt:'10~18°C',pos:'6~22°C',limit:'상한 22°C'}},
+
+  '삼치':{emoji:'🐟',habitat:'외해/갯바위',depth:'표층~20m',
+    season:[0,0,0,1,1,0,0,0,1,2,2,0],peak:[9,10],
+    seaW:[0,0,0,0,1,0,0,0,1,2,1,0], seaS:[0,0,0,1,1,0,0,0,1,2,2,0], seaE:[0,0,0,0,1,0,0,0,1,2,2,0],
+    tackle:['스푼(30~40g)','메탈지그','대형 미노우'],
+    tips:'표층 고속 릴링 필수. 동해 가을 갯바위 캐스팅 최고. 12°C 이하 남하.',
+    seaTemp:{opt:'16~22°C',pos:'12~25°C',limit:'하한 12°C'}},
+
+  '방어':{emoji:'🐟',habitat:'외해/갯바위',depth:'표층~50m',
+    season:[0,0,0,0,0,0,0,0,0,1,2,2],peak:[10,11],
+    seaW:[0,0,0,0,0,0,0,0,0,0,0,0], seaS:[0,0,0,0,0,0,0,0,0,1,2,2], seaE:[0,0,0,0,0,0,0,0,0,1,2,1],
+    tackle:['대형 팝퍼','캐스팅 루어'],
+    tips:'10~12월 남해·제주 대방어 시즌. 사리 전후 연안 집결. 기름진 11~12월 최고.',
+    seaTemp:{opt:'18~24°C',pos:'15~27°C',limit:'하한 15°C'}},
+
+  '고등어':{emoji:'🐟',habitat:'방파제/갯바위',depth:'표층~15m',
+    season:[0,0,0,0,0,0,0,1,2,2,1,0],peak:[8,9,10],
+    seaW:[0,0,0,0,0,0,0,1,2,1,0,0], seaS:[0,0,0,0,0,0,0,1,2,2,1,0], seaE:[0,0,0,0,0,0,1,2,2,1,0,0],
+    tackle:['사비키(카드채비)','소형 루어'],
+    tips:'만조 전후 2~3시간 황금. 크릴 밑밥 꾸준히. 13°C 이하 연안 이탈. 가을 기름진 고등어 최고.',
+    seaTemp:{opt:'18~21°C',pos:'13~25°C',limit:'하한 13°C'}},
+
+  '문어':{emoji:'🐙',habitat:'갯바위/암초',depth:'5~30m',
+    season:[0,0,0,0,1,2,2,2,2,1,0,0],peak:[5,6,7,8],
+    seaW:[0,0,0,0,0,1,2,2,1,0,0,0], seaS:[0,0,0,0,1,2,2,2,2,1,0,0], seaE:[0,0,0,0,1,1,2,2,2,1,0,0],
+    tackle:['타코에기(문어에기)'],
+    tips:'갯바위·테트라포드 암초 틈새. 바닥 천천히 끌다가 묵직하면 챔질. 15°C 이하 심해 은신.',
+    seaTemp:{opt:'18~26°C',pos:'15~28°C',limit:'하한 15°C'}},
+
+  '도다리':{emoji:'🐟',habitat:'모래바닥',depth:'5~30m',
+    season:[0,2,2,2,0,0,0,0,0,0,0,0],peak:[1,2,3],
+    seaW:[0,0,1,1,0,0,0,0,0,0,0,0], seaS:[0,1,2,1,0,0,0,0,0,0,0,0], seaE:[0,2,2,2,0,0,0,0,0,0,0,0],
+    tackle:['원투낚시(바닥채비)'],
+    tips:'"봄 도다리" 동해 3월이 최고. 15°C 이상 심해 이동. 모래해변 30~50m 원투.',
+    seaTemp:{opt:'8~14°C',pos:'5~18°C',limit:'상한 18°C'}},
+
+  '꽃게':{emoji:'🦀',habitat:'서해 갯벌/모래',depth:'5~30m',
+    season:[0,0,0,2,2,0,0,0,2,2,0,0],peak:[3,4,8,9],
+    seaW:[0,0,0,2,2,0,0,0,2,2,0,0], seaS:[0,0,0,0,0,0,0,0,0,0,0,0], seaE:[0,0,0,0,0,0,0,0,0,0,0,0],
+    tackle:['원투낚시','게 전용채비'],
+    tips:'서해 전용. 봄(암게·알배기), 가을(수게·살오름). 사리 물때 연안 접근 많음.',
+    seaTemp:{opt:'15~22°C',pos:'12~25°C',limit:'하한 12°C'}},
+
+  '쥐노래미':{emoji:'🐟',habitat:'암초/방파제',depth:'5~25m',
+    season:[2,2,1,0,0,0,0,0,0,0,1,2],peak:[0,1,11],
+    seaW:[2,2,1,0,0,0,0,0,0,0,1,2], seaS:[2,2,1,0,0,0,0,0,0,0,1,2], seaE:[2,2,1,0,0,0,0,0,0,0,1,2],
+    tackle:['루어','찌낚시'],
+    tips:'수온 낮을수록 활성 최고. 야간 암초 공략. 여름 완전 비수기.',
+    seaTemp:{opt:'8~14°C',pos:'5~18°C',limit:'상한 18°C'}},
+
+  '벵에돔':{emoji:'🐟',habitat:'갯바위/암초',depth:'5~30m',
+    season:[0,0,0,0,1,2,2,2,2,2,1,0],peak:[5,6,7,8,9],
+    seaW:[0,0,0,0,0,0,0,0,0,0,0,0], seaS:[0,0,0,0,1,2,2,2,2,2,1,0], seaE:[0,0,0,0,0,1,2,2,2,1,0,0],
+    tackle:['반유동·전유동 찌낚시'],
+    tips:'15°C 이하 활동 급감. 남해 원도권(거문도·여서도) 최고. 크릴 밑밥 집어 중요.',
+    seaTemp:{opt:'18~26°C',pos:'15~28°C',limit:'하한 15°C'}},
+
+  '숭어':{emoji:'🐟',habitat:'방파제/강하구',depth:'표층~10m',
+    season:[0,0,2,2,1,0,0,0,1,2,1,0],peak:[2,3,9],
+    seaW:[0,0,2,2,1,0,0,0,1,2,1,0], seaS:[0,0,1,2,1,0,0,0,1,2,1,0], seaE:[0,0,1,2,1,0,0,0,1,2,1,0],
+    tackle:['찌낚시','루어(미노우)','원투'],
+    tips:'강 하구 기수역·방파제 해질녘. 겁 많아 발소리·그림자에도 도망. 조용히 접근 필수.',
+    seaTemp:{opt:'12~20°C',pos:'8~25°C',limit:'하한 8°C'}},
+
+  '전갱이':{emoji:'🐟',habitat:'방파제/갯바위',depth:'표층~20m',
+    season:[0,0,0,0,1,2,2,1,0,0,0,0],peak:[5,6],
+    seaW:[0,0,0,0,1,2,1,0,0,0,0,0], seaS:[0,0,0,0,1,2,2,1,0,0,0,0], seaE:[0,0,0,0,1,2,2,1,0,0,0,0],
+    tackle:['사비키','소형 루어'],
+    tips:'봄~여름 방파제 사비키. 고등어와 같이 이동. 여름 이후 비수기.',
+    seaTemp:{opt:'15~22°C',pos:'12~25°C',limit:'하한 12°C'}},
+
+  '망상어':{emoji:'🐟',habitat:'방파제/갯바위',depth:'3~15m',
+    season:[2,2,2,1,0,0,0,0,0,0,1,2],peak:[0,1,2,11],
+    seaW:[0,0,0,0,0,0,0,0,0,0,0,0], seaS:[0,0,0,0,0,0,0,0,0,0,0,0], seaE:[2,2,2,1,0,0,0,0,0,0,1,2],
+    tackle:['찌낚시','소형 루어'],
+    tips:'동해 겨울 방파제 전용 어종. 8°C 이하에서도 활발. 떼지어 이동.',
+    seaTemp:{opt:'8~14°C',pos:'5~18°C',limit:'상한 18°C'}},
+
+  '붕장어':{emoji:'🐍',habitat:'방파제/갯바위/모래',depth:'5~30m',
+    season:[0,0,0,0,1,2,2,2,1,0,0,0],peak:[5,6,7],
+    seaW:[0,0,0,0,1,2,2,2,1,0,0,0], seaS:[0,0,0,0,1,2,2,2,1,0,0,0], seaE:[0,0,0,0,1,2,2,2,1,0,0,0],
+    tackle:['야간 원투낚시'],
+    tips:'야간 전용. 방파제·항구 모랫바닥 원투. 14°C 이하 연안 완전 이탈.',
+    seaTemp:{opt:'18~26°C',pos:'14~28°C',limit:'하한 14°C'}},
+
+  '노래미':{emoji:'🐟',habitat:'갯바위/암초/방파제',depth:'5~25m',
+    season:[0,0,2,2,2,0,0,0,1,2,1,0],peak:[2,3,4,9],
+    seaW:[0,0,2,2,2,0,0,0,1,2,1,0], seaS:[0,0,2,2,2,0,0,0,1,2,1,0], seaE:[0,1,2,2,1,0,0,0,1,2,2,0],
+    tackle:['루어(웜)','원투낚시'],
+    tips:'봄(3~5월)·가을(9~11월) 피크. 여름 완전 비수기. 암초 사이 바닥층 공략.',
+    seaTemp:{opt:'10~18°C',pos:'6~22°C',limit:'상한 22°C'}},
+
+  '학꽁치':{emoji:'🐟',habitat:'방파제/연안',depth:'표층~5m',
+    season:[0,0,2,2,1,0,0,0,0,0,0,0],peak:[2,3],
+    seaW:[0,0,0,1,1,1,0,0,0,0,0,0], seaS:[0,0,2,2,1,0,0,0,0,0,0,0], seaE:[0,0,2,2,1,0,0,0,0,0,0,0],
+    tackle:['찌낚시','사비키'],
+    tips:'봄 방파제 표층 찌낚시. 밑밥으로 집어 후 공략. 5월 이후 수온 오르면 북상.',
+    seaTemp:{opt:'12~18°C',pos:'8~22°C',limit:'상한 22°C'}},
+
+  '감성돔(야간)':{emoji:'🐟',habitat:'방파제/갯바위',depth:'5~20m',
+    season:[1,1,0,0,0,0,0,0,0,0,0,1],peak:[0,1,11],
+    seaW:[0,0,0,0,0,0,0,0,0,0,0,0], seaS:[1,1,0,0,0,0,0,0,0,0,0,1], seaE:[0,0,0,0,0,0,0,0,0,0,0,0],
+    tackle:['찌낚시'],
+    tips:'남해 겨울 방파제 야간 전용. 수온 10~15°C 유지되는 남해 원도권 한정.',
+    seaTemp:{opt:'10~15°C',pos:'8~17°C',limit:'하한 8°C'}},
+}
+
+// ════════════════════════════════════════
+// POINTS - 확장판 (선상 위주 제거, 갯바위/서프/방파제 위주)
+// ════════════════════════════════════════
+const POINTS = [
+  // ── 서해 ──
+  {id:'w1',name:'인천 덕적도',region:'서해',lat:37.232,lng:126.143,hot:true,
+   fishStyle:['갯바위','방파제','찌낚시','루어'],
+   type:'갯바위/방파제',
+   fish:['우럭','광어','감성돔','꽃게','조기','백조기','숭어','전갱이','노래미','붕장어'],
+   depth:{안쪽:'5~15m',외해:'15~40m',평균:'10~20m'},
+   highlights:['서해 대표 낚시 섬','갯바위·방파제 모두 가능','연중 우럭'],
+   info:'서해 최고 낚시 섬. 비조봉 갯바위, 서포리 방파제 등 섬 전체가 포인트. 봄 조기·가을 감성돔 전국 집결지. 조류가 강해 물때 맞추기 필수.',
+   tags:['섬낚시','갯바위','1박2일','찌낚시']},
+
+  {id:'w2',name:'태안 안면도',region:'서해',lat:36.538,lng:126.397,hot:false,
+   fishStyle:['방파제','원투','찌낚시'],
+   type:'방파제/갯벌',
+   fish:['농어','광어','우럭','감성돔','꽃게','숭어','전어','붕장어','도다리'],
+   depth:{안쪽:'3~10m',방파제끝:'10~20m',평균:'5~15m'},
+   highlights:['꽃게 원투 명소','봄가을 감성돔','조석 차 큰 서해'],
+   info:'안면도 꽃지·영목 방파제. 봄 꽃게 원투낚시와 가을 감성돔 찌낚시 유명. 물때가 매우 중요.',
+   tags:['방파제','원투','꽃게','가족']},
+
+  {id:'w3',name:'서천 홍원항',region:'서해',lat:36.201,lng:126.541,hot:false,
+   fishStyle:['방파제','원투','찌낚시'],
+   type:'방파제',
+   fish:['우럭','광어','조기','백조기','감성돔','전갱이','고등어','숭어','붕장어'],
+   depth:{방파제안쪽:'5~12m',방파제끝:'12~25m',평균:'8~18m'},
+   highlights:['봄 조기 황금어장','방파제 감성돔'],
+   info:'충남 서해안 대표 항구. 봄 조기, 가을 감성돔 시즌 유명. 방파제 끝 외항 쪽 찌낚시/원투.',
+   tags:['방파제','봄조기','찌낚시']},
+
+  {id:'w4',name:'군산 고군산군도',region:'서해',lat:35.853,lng:126.483,hot:true,
+   fishStyle:['갯바위','방파제','찌낚시','루어'],
+   type:'갯바위/방파제',
+   fish:['우럭','광어','조기','백조기','감성돔','꽃게','삼치','전갱이','노래미','붕장어'],
+   depth:{안쪽:'5~15m',외해:'20~50m',평균:'10~25m'},
+   highlights:['유인도 53개 전체 포인트','차량 접근 가능','봄조기 성지'],
+   info:'신시도·무녀도·선유도 등 서해 최대 다도해. 봄 조기와 가을 감성돔·삼치. 새만금방조제로 차량 접근.',
+   tags:['섬낚시','갯바위','차량접근']},
+
+  {id:'w5',name:'보령 대천방파제',region:'서해',lat:36.317,lng:126.545,hot:false,
+   fishStyle:['방파제','원투','찌낚시'],
+   type:'방파제',
+   fish:['우럭','광어','꽃게','백조기','감성돔','노래미','전갱이','고등어','붕장어'],
+   depth:{방파제안쪽:'4~10m',방파제끝:'10~20m',평균:'7~15m'},
+   highlights:['방파제 우럭 연중','대천해수욕장 인근'],
+   info:'충남 대표 항구. 방파제 찌낚시/원투 우럭낚시 연중 가능. 대천해수욕장과 함께.',
+   tags:['방파제','원투','우럭']},
+
+  {id:'w6',name:'당진 왜목마을',region:'서해',lat:36.981,lng:126.672,hot:false,
+   fishStyle:['방파제','갯벌','원투'],
+   type:'방파제/갯벌',
+   fish:['농어','광어','우럭','숭어','꽃게','전어','노래미','붕장어'],
+   depth:{방파제:'3~10m',갯벌:'1~5m',평균:'3~8m'},
+   highlights:['서해 일출 명소','숭어 루어 명소'],
+   info:'서해 일출 명소. 방파제와 갯벌에서 숭어·광어 낚시. 가을 전어도 가능.',
+   tags:['방파제','일출','숭어']},
+
+  {id:'w7',name:'인천 영종도 을왕리',region:'서해',lat:37.459,lng:126.390,hot:false,
+   fishStyle:['방파제','서프','원투'],
+   type:'서프/방파제',
+   fish:['농어','광어','우럭','숭어','꽃게','전어','감성돔','붕장어'],
+   depth:{서프:'1~5m',방파제:'5~15m',평균:'3~10m'},
+   highlights:['수도권 최고 접근성','서프 농어 루어'],
+   info:'인천공항 인근. 을왕리 서프에서 농어 루어낚시, 방파제 원투 가능. 수도권 최고 접근성.',
+   tags:['서프','루어','수도권']},
+
+  // ── 남해 ──
+  {id:'s1',name:'여수 돌산도',region:'남해',lat:34.738,lng:127.789,hot:true,
+   fishStyle:['갯바위','방파제','찌낚시','에깅'],
+   type:'갯바위/방파제',
+   fish:['감성돔','농어','벵에돔','참돔','볼락','무늬오징어','갑오징어','갈치','문어','삼치','쭈꾸미','노래미'],
+   depth:{갯바위:'8~25m',방파제:'5~15m',평균:'8~20m'},
+   highlights:['감성돔·벵에돔 전국 최고','돌산대교 차량 접근','야간 볼락 인기'],
+   info:'여수 돌산대교 건너 갯바위 낚시 천국. 방죽포·무슬목 방파제, 외해 갯바위. 찌낚시/에깅 모두 최고.',
+   tags:['갯바위','찌낚시','차량접근','야간']},
+
+  {id:'s2',name:'통영 사량도',region:'남해',lat:34.886,lng:128.165,hot:true,
+   fishStyle:['갯바위','찌낚시','루어'],
+   type:'갯바위',
+   fish:['감성돔','참돔','벵에돔','농어','삼치','볼락','무늬오징어','방어','갈치','쭈꾸미'],
+   depth:{갯바위:'10~35m',평균:'15~30m'},
+   highlights:['남해 갯바위 성지','봄 참돔·가을 감성돔','전국 1순위 갯바위'],
+   info:'남해 최고의 갯바위 낚시 섬. 상도·하도 전체가 포인트. 봄 참돔, 가을 감성돔 전국 집결. 갯바위 찌낚시 성지.',
+   tags:['갯바위','찌낚시','성지','섬낚시']},
+
+  {id:'s3',name:'거제 외포·도장포',region:'남해',lat:34.808,lng:128.683,hot:false,
+   fishStyle:['방파제','갯바위','찌낚시','에깅'],
+   type:'방파제/갯바위',
+   fish:['감성돔','볼락','우럭','무늬오징어','갑오징어','농어','갈치','전어','노래미','쭈꾸미','붕장어'],
+   depth:{방파제:'5~15m',갯바위:'8~20m',평균:'8~15m'},
+   highlights:['겨울 볼락 야간 명소','오징어 에깅'],
+   info:'거제도 동부. 방파제와 갯바위. 겨울 볼락 야간 찌낚시/루어와 봄 감성돔 유명.',
+   tags:['방파제','볼락','야간','에깅']},
+
+  {id:'s4',name:'남해 미조·상주',region:'남해',lat:34.728,lng:127.935,hot:false,
+   fishStyle:['방파제','갯바위','찌낚시'],
+   type:'방파제/갯바위',
+   fish:['감성돔','볼락','참돔','무늬오징어','학꽁치','벵에돔','농어','갈치','노래미'],
+   depth:{방파제:'5~18m',갯바위:'10~25m',평균:'8~20m'},
+   highlights:['봄 학꽁치 유명','가을 감성돔'],
+   info:'남해 최남단. 미조항·상주방파제. 봄 학꽁치 찌낚시와 가을 감성돔 최고.',
+   tags:['방파제','찌낚시','학꽁치']},
+
+  {id:'s5',name:'부산 다대포',region:'남해',lat:35.044,lng:128.961,hot:false,
+   fishStyle:['서프','방파제','루어','원투'],
+   type:'서프/방파제',
+   fish:['농어','광어','감성돔','삼치','갑오징어','쭈꾸미','볼락','전어','숭어','고등어'],
+   depth:{서프:'1~5m',방파제:'5~12m',평균:'3~8m'},
+   highlights:['대중교통 접근 가능','서프 농어 루어'],
+   info:'낙동강 하구 서프·방파제. 봄 농어 루어와 가을 감성돔. 지하철 접근 가능.',
+   tags:['서프','루어','대중교통']},
+
+  {id:'s6',name:'완도 신지도',region:'남해',lat:34.303,lng:126.869,hot:true,
+   fishStyle:['갯바위','방파제','찌낚시'],
+   type:'갯바위/방파제',
+   fish:['감성돔','벵에돔','참돔','볼락','무늬오징어','갑오징어','농어','갈치','문어','삼치','쭈꾸미'],
+   depth:{갯바위:'8~30m',방파제:'5~15m',평균:'8~20m'},
+   highlights:['신지대교 차량 접근','갯바위 전국 최고'],
+   info:'완도 인근 섬. 신지대교 차량 접근. 갯바위 감성돔·벵에돔 전국 최고 포인트 중 하나.',
+   tags:['갯바위','찌낚시','차량접근']},
+
+  {id:'s7',name:'고성 자란만',region:'남해',lat:34.928,lng:128.362,hot:false,
+   fishStyle:['방파제','찌낚시','루어'],
+   type:'방파제',
+   fish:['감성돔','우럭','무늬오징어','갑오징어','농어','노래미','볼락','갈치','쭈꾸미','붕장어'],
+   depth:{방파제:'5~15m',평균:'8~12m'},
+   highlights:['조용한 내만 포인트'],
+   info:'고성 자란만 방파제. 조용한 내만 낚시. 감성돔 찌낚시와 루어 농어.',
+   tags:['방파제','내만','조용']},
+
+  {id:'s8',name:'창원 마산만',region:'남해',lat:35.180,lng:128.530,hot:false,
+   fishStyle:['방파제','원투','찌낚시'],
+   type:'방파제',
+   fish:['숭어','감성돔','볼락','전어','무늬오징어','갑오징어','쭈꾸미','농어','갈치','붕장어'],
+   depth:{방파제:'3~12m',평균:'5~10m'},
+   highlights:['가을 전어 유명','도심 낚시'],
+   info:'마산만 방파제. 가을 전어 사비키와 붕장어 원투 야간낚시 인기.',
+   tags:['방파제','전어','야간','도심']},
+
+  {id:'s9',name:'여수 화정면 백야도',region:'남해',lat:34.608,lng:127.680,hot:true,
+   fishStyle:['갯바위','찌낚시','루어'],
+   type:'갯바위',
+   fish:['감성돔','벵에돔','볼락','문어','무늬오징어','참돔','농어','갈치','삼치'],
+   depth:{갯바위:'10~30m',평균:'12~25m'},
+   highlights:['숨은 갯바위 성지','백야대교 차량 접근'],
+   info:'백야대교로 차량 접근 가능한 갯바위. 감성돔·벵에돔 조황 최고. 루어 문어도 인기.',
+   tags:['갯바위','차량접근','찌낚시']},
+
+  // ── 동해 ──
+  {id:'e1',name:'강릉 주문진항',region:'동해',lat:37.896,lng:128.820,hot:true,
+   fishStyle:['방파제','갯바위','루어','원투'],
+   type:'방파제/갯바위',
+   fish:['우럭','광어','가자미','무늬오징어','삼치','고등어','볼락','노래미','망상어','도다리'],
+   depth:{방파제:'5~15m',갯바위:'8~25m',평균:'8~18m'},
+   highlights:['동해 최대 어항','오징어 에깅 성지','KTX 접근'],
+   info:'동해 최대 어항. 빨간 등대 방파제와 인근 갯바위. 오징어 에깅 시즌(여름~가을) 전국 집결. 루어/원투 모두 가능.',
+   tags:['방파제','에깅','루어','접근성좋음']},
+
+  {id:'e2',name:'속초 영금정',region:'동해',lat:38.195,lng:128.593,hot:false,
+   fishStyle:['갯바위','방파제','루어','찌낚시'],
+   type:'갯바위/방파제',
+   fish:['우럭','볼락','광어','가자미','무늬오징어','고등어','망상어','쥐노래미','노래미','도다리'],
+   depth:{갯바위:'5~20m',방파제:'3~15m',평균:'5~15m'},
+   highlights:['일출 명소','겨울 볼락 야간','망상어 겨울 시즌'],
+   info:'속초 영금정 갯바위와 속초항 방파제. 겨울 볼락 야간 루어/찌낚시. 망상어도 재미있는 포인트.',
+   tags:['갯바위','볼락','야간','일출']},
+
+  {id:'e3',name:'울진 후포항',region:'동해',lat:36.979,lng:129.445,hot:true,
+   fishStyle:['방파제','갯바위','루어','원투'],
+   type:'방파제/갯바위',
+   fish:['우럭','광어','삼치','무늬오징어','가자미','고등어','볼락','노래미','붕장어','도다리'],
+   depth:{방파제:'5~18m',갯바위:'8~30m',평균:'8~20m'},
+   highlights:['가을 삼치 루어 명소','대게 산지'],
+   info:'울진 후포항 방파제와 갯바위. 가을 삼치 루어캐스팅 인기. 방파제 원투도 풍성.',
+   tags:['방파제','루어','삼치','대게']},
+
+  {id:'e4a',name:'포항 구룡포항',region:'동해',lat:35.9891,lng:129.5590,hot:false,
+   fishStyle:['방파제','갯바위','루어','찌낚시'],
+   type:'방파제/갯바위',
+   fish:['감성돔','우럭','볼락','무늬오징어','가자미','광어','삼치','노래미','망상어','도다리'],
+   depth:{갯바위:'8~25m',방파제:'5~15m',평균:'8~18m'},
+   highlights:['과메기 산지','가을 감성돔','방어'],
+   info:'포항 구룡포 방파제와 인근 갯바위. 가을 감성돔 찌낚시·삼치 루어 유명. 대게·과메기 산지.',
+   tags:['방파제','갯바위','찌낚시','대게']},
+
+  {id:'e4b',name:'포항 호미곶',region:'동해',lat:36.0771,lng:129.5673,hot:false,
+   fishStyle:['갯바위','방파제','루어','원투'],
+   type:'갯바위/방파제',
+   fish:['감성돔','우럭','볼락','무늬오징어','가자미','광어','삼치','노래미','대구','도다리'],
+   depth:{갯바위:'10~30m',방파제:'5~18m',평균:'10~20m'},
+   highlights:['호미곶 일출 명소','겨울 대구 원투','한반도 최동단'],
+   info:'한반도 최동단 호미곶. 갯바위와 방파제. 겨울 대구 원투·가을 감성돔 찌낚시 유명. 일출 명소.',
+   tags:['갯바위','일출','대구','찌낚시']},
+
+  {id:'e5',name:'삼척 장호항',region:'동해',lat:37.3064,lng:129.2247,hot:false,
+   fishStyle:['방파제','갯바위','루어'],
+   type:'방파제/갯바위',
+   fish:['우럭','볼락','무늬오징어','광어','가자미','고등어','노래미','망상어','도다리'],
+   depth:{방파제:'3~12m',갯바위:'5~18m',평균:'5~12m'},
+   highlights:['비경 장호만','투명한 동해 바다'],
+   info:'비경 장호만. 투명한 바다와 방파제 루어낚시. 가족 낚시 포인트.',
+   tags:['방파제','루어','비경','가족']},
+
+  {id:'e6',name:'양양 남애항',region:'동해',lat:38.002,lng:128.736,hot:false,
+   fishStyle:['서프','방파제','루어'],
+   type:'서프/방파제',
+   fish:['농어','광어','우럭','무늬오징어','가자미','고등어','볼락','삼치','노래미','도다리'],
+   depth:{서프:'1~5m',방파제:'5~15m',평균:'3~10m'},
+   highlights:['서퍼 성지 인근','봄여름 농어 루어'],
+   info:'서퍼 성지 양양. 남애항 방파제와 서프. 봄~여름 농어 루어낚시 인기.',
+   tags:['서프','루어','농어']},
+
+  {id:'e7',name:'동해 묵호항',region:'동해',lat:37.551,lng:129.121,hot:false,
+   fishStyle:['방파제','갯바위','원투','루어'],
+   type:'방파제/갯바위',
+   fish:['우럭','가자미','무늬오징어','광어','고등어','망상어','볼락','노래미','붕장어','도다리'],
+   depth:{방파제:'5~18m',갯바위:'8~22m',평균:'8~16m'},
+   highlights:['겨울 가자미 원투','연중 우럭'],
+   info:'동해시 묵호항 방파제. 겨울 가자미 원투낚시와 우럭 루어낚시 연중 가능.',
+   tags:['방파제','원투','가자미']},
+
+  // ── 제주 ──
+  {id:'j1',name:'제주 서귀포 문섬',region:'제주',lat:33.237,lng:126.562,hot:true,
+   fishStyle:['갯바위','찌낚시','에깅'],
+   type:'갯바위',
+   fish:['벵에돔','참돔','무늬오징어','볼락','감성돔','방어','고등어','삼치','농어'],
+   depth:{갯바위:'10~40m',평균:'15~35m'},
+   highlights:['전국 벵에돔 최고','문섬·범섬 외해 갯바위'],
+   info:'제주 최고 낚시 포인트. 문섬·범섬·섶섬 외해 갯바위. 벵에돔 찌낚시 전국 최고.',
+   tags:['갯바위','찌낚시','벵에돔']},
+
+  {id:'j2',name:'제주 모슬포방파제',region:'제주',lat:33.213,lng:126.243,hot:true,
+   fishStyle:['방파제','갯바위','루어','찌낚시'],
+   type:'방파제/갯바위',
+   fish:['방어','삼치','참돔','무늬오징어','벵에돔','감성돔','고등어','농어','갈치'],
+   depth:{방파제:'5~15m',갯바위:'10~25m',평균:'8~18m'},
+   highlights:['겨울 대방어 유명','마라도 도선 출발지'],
+   info:'제주 최남단 방파제. 겨울 방어 루어캐스팅. 갯바위 찌낚시도 좋음.',
+   tags:['방파제','루어','방어','겨울']},
+
+  {id:'j3',name:'제주 우도',region:'제주',lat:33.509,lng:126.952,hot:false,
+   fishStyle:['갯바위','방파제','찌낚시'],
+   type:'갯바위/방파제',
+   fish:['벵에돔','볼락','무늬오징어','참돔','감성돔','고등어','농어','삼치','갈치'],
+   depth:{갯바위:'8~25m',방파제:'5~12m',평균:'8~18m'},
+   highlights:['청정 바다','성산항 도선'],
+   info:'제주 동부 우도섬. 갯바위 벵에돔 찌낚시와 방파제 볼락. 청명한 제주 바다.',
+   tags:['갯바위','찌낚시','벵에돔']},
+];
+
+// ════════════════════════════════════════
+// 낚시 스타일 (선상 제외 확인용)
+// ════════════════════════════════════════
+const COAST_STYLES = ['갯바위','방파제','서프','원투','찌낚시','루어','에깅','캐스팅'];
+
+// ════════════════════════════════════════
+// STATE
+// ════════════════════════════════════════
+let map, currentMonth = new Date().getMonth();
+let selectedPoint = null, addingPoint = false;
+let myPoints = JSON.parse(localStorage.getItem('myPoints')||'[]');
+let records   = JSON.parse(localStorage.getItem('records')||'[]');
+let pointWeathers = {};
+let markers = {}; // ptId -> leaflet marker
+let activeFilter = null; // 어종 필터
+
+// ════════════════════════════════════════
+// INIT
+// ════════════════════════════════════════
+window.addEventListener('load',()=>{
+  initMap();
+  initMonthGrid();
+  updateMonthLabel();
+  loadRecordSpots();
+  renderRecords();
+  renderFishBar();
+  getMyLocation();
+});
+
+// ════════════════════════════════════════
+// MAP
+// ════════════════════════════════════════
+function initMap(){
+  map = L.map('map',{zoomControl:false,minZoom:6,maxZoom:17}).setView([36.0,127.8],7);
+  map.setMaxBounds([[28,118],[40,132]]);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap',maxZoom:17}).addTo(map);
+  L.control.zoom({position:'topright'}).addTo(map);
+  POINTS.forEach(pt => { const m = addPointMarker(pt); markers[pt.id] = m; });
+  myPoints.forEach(pt => addMyPointMarker(pt));
+  map.on('click', e => { if(addingPoint) promptAddMyPoint(e.latlng); });
+}
+
+function mkIcon(type){
+  const cfg={
+    hot:{bg:'#FF5252',e:'🔥'},normal:{bg:'#2196F3',e:'🎣'},
+    my:{bg:'#FF7043',e:'📌'},visited:{bg:'#26A69A',e:'✓'},
+    dim:{bg:'#CBD5E0',e:'·'}
+  }[type]||{bg:'#2196F3',e:'🎣'};
+  return L.divIcon({
+    html:`<div style="width:30px;height:30px;background:${cfg.bg};border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:3px solid white;box-shadow:0 3px 10px rgba(0,0,0,0.28);display:flex;align-items:center;justify-content:center;"><span style="transform:rotate(45deg);font-size:12px;">${cfg.e}</span></div>`,
+    className:'',iconSize:[30,30],iconAnchor:[15,30],popupAnchor:[0,-32]
+  });
+}
+
+function ptType(pt){
+  if(records.some(r=>r.spotId===pt.id)) return 'visited';
+  if(pt.hot) return 'hot';
+  return 'normal';
+}
+
+function addPointMarker(pt){
+  const m = L.marker([pt.lat,pt.lng],{icon:mkIcon(ptType(pt))}).addTo(map);
+  m.on('click',function(e){
+    L.DomEvent.stopPropagation(e);
+    // 이미 이 마커 팝업 열려있으면 → 드로어로
+    if(m.getPopup()&&m.isPopupOpen()){
+      map.closePopup();
+      openDrawer(pt.id);
+      return;
+    }
+    // 다른 팝업 닫고 이 마커 팝업 열기
+    map.closePopup();
+    // 이전 바인딩 제거 후 새로 열기 (재클릭 시 반응 없는 버그 수정)
+    m.unbindPopup();
+    showMiniPopup(pt,m);
+  });
+  return m;
+}
+
+function addMyPointMarker(pt){
+  const m = L.marker([pt.lat,pt.lng],{icon:mkIcon('my')}).addTo(map);
+  m.on('click',()=>showMiniPopup({...pt,region:'내 포인트',hot:false,fish:[],type:'내 포인트',highlights:[],info:pt.memo||'내 포인트',depth:{},tags:['내 포인트'],fishStyle:[]},m));
+  markers[pt.id]=m;
+}
+
+// 월 변경 or 어종 필터 변경 시 마커 업데이트
+function updateMarkers(){
+  POINTS.forEach(pt=>{
+    const m = markers[pt.id]; if(!m) return;
+    const mo = currentMonth;
+    const hasPeak = pt.fish.some(f=>FISH_DB[f]&&FISH_DB[f].peak&&FISH_DB[f].peak.includes(mo));
+    const hasSeason = pt.fish.some(f=>FISH_DB[f]&&FISH_DB[f].season[mo]>=1);
+    const matchFilter = !activeFilter || pt.fish.includes(activeFilter);
+    if(!matchFilter){
+      m.setIcon(mkIcon('dim')); m.setOpacity(0.12);
+    } else if(hasPeak){
+      m.setIcon(mkIcon(ptType(pt))); m.setOpacity(1.0);
+    } else if(hasSeason){
+      m.setIcon(mkIcon(ptType(pt))); m.setOpacity(0.5);
+    } else {
+      m.setIcon(mkIcon('dim')); m.setOpacity(0.15);
+    }
+  });
+}
+
+// ════════════════════════════════════════
+// LOCATION + WEATHER
+// ════════════════════════════════════════
+function getMyLocation(){
+  if(!navigator.geolocation){ fetchMyWx(36.5,127.8,'기본위치'); fetchAllPtWx(); return; }
+  navigator.geolocation.getCurrentPosition(
+    pos=>{ revGeo(pos.coords.latitude,pos.coords.longitude); fetchMyWx(pos.coords.latitude,pos.coords.longitude,null); fetchAllPtWx(); },
+    ()=>{ fetchMyWx(36.5,127.8,'위치 미허용'); fetchAllPtWx(); },
+    {timeout:7000}
+  );
+}
+
+async function revGeo(lat,lng){
+  try{
+    const r=await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=ko`);
+    const d=await r.json(); const a=d.address;
+    document.getElementById('ws-loc').textContent='📍 '+(a.city||a.county||a.town||a.village||'현재위치');
+  }catch(e){}
+}
+
+// Open-Meteo 단일 API (빠른 응답)
+async function getBestWind(lat,lng){
+  try{
+    const r=await fetch('https://api.open-meteo.com/v1/forecast?latitude='+lat+'&longitude='+lng+'&current=windspeed_10m,winddirection_10m&wind_speed_unit=ms&timezone=Asia/Seoul');
+    const d=await r.json();
+    const raw=parseFloat(d.current&&d.current.windspeed_10m);
+    if(!isNaN(raw)) return {wind:raw,windDir:parseFloat(d.current.winddirection_10m)||0};
+  }catch(e){}
+  return {wind:3,windDir:0};
+}
+// Marine API 사용: wave_height, wind_speed_10m (해상 풍속)
+async function fetchMyWx(lat,lng,label){
+  try{
+    // atmosphere + marine 분리 호출
+    const [atmRes, marRes] = await Promise.all([
+      fetch('https://api.open-meteo.com/v1/forecast?latitude='+lat+'&longitude='+lng+'&current=temperature_2m,weathercode,windspeed_10m,winddirection_10m&wind_speed_unit=ms&timezone=Asia/Seoul'),
+      fetch('https://marine-api.open-meteo.com/v1/marine?latitude='+lat+'&longitude='+lng+'&current=wave_height&timezone=Asia/Seoul')
+    ]);
+    const atm = await atmRes.json();
+    const mar = await marRes.json();
+    const c = atm.current;
+    const wind = parseFloat(c.windspeed_10m);
+    const wave = parseFloat(mar.current?.wave_height ?? 0.5);
+    const temp = parseFloat(c.temperature_2m);
+    document.getElementById('ws-temp').textContent = temp.toFixed(1)+'°C';
+    document.getElementById('ws-wave').textContent = wave.toFixed(1)+'m';
+    document.getElementById('ws-weather').textContent = wCode(c.weathercode);
+    document.getElementById('ws-seatemp').textContent = estSeaT(lat,currentMonth)+'°C';
+    const we = document.getElementById('ws-wind');
+    we.textContent = wind.toFixed(1)+'m/s';
+    we.className = 'wx-val '+wCls(wind);
+    if(label) document.getElementById('ws-loc').textContent='📍 '+label;
+    setTideLbl('ws-stub'); // tide in strip removed per request
+  }catch(e){ console.log('wx err',e); }
+}
+
+async function fetchAllPtWx(){
+  // 즉시 날씨 없이 추천 표시 (체감 속도 향상)
+  buildRecChips();
+  // 전체 동시 호출 (배치 제거)
+  await Promise.all(POINTS.map(fetchPtWx));
+  // 날씨 들어온 후 추천 업데이트
+  buildRecChips();
+}
+
+async function fetchPtWx(pt){
+  try{
+    // 단일 API로 기온+바람+파고 한번에
+    const [atmRes, marRes] = await Promise.all([
+      fetch('https://api.open-meteo.com/v1/forecast?latitude='+pt.lat+'&longitude='+pt.lng+'&current=temperature_2m,weathercode,windspeed_10m,winddirection_10m&wind_speed_unit=ms&timezone=Asia/Seoul'),
+      fetch('https://marine-api.open-meteo.com/v1/marine?latitude='+pt.lat+'&longitude='+pt.lng+'&current=wave_height&timezone=Asia/Seoul')
+    ]);
+    const atm = await atmRes.json();
+    const mar = await marRes.json();
+    const c = atm.current;
+    pointWeathers[pt.id] = {
+      wind: parseFloat(c.windspeed_10m),
+      windDir: parseFloat(c.winddirection_10m)||0,
+      wave: parseFloat(mar.current?.wave_height ?? 0.5),
+      temp: parseFloat(c.temperature_2m),
+      wcode: c.weathercode
+    };
+  }catch(e){}
+}
+
+function wCode(c){
+  if(c===0)return'☀️맑음';if(c<=2)return'⛅구름';if(c<=3)return'☁️흐림';
+  if(c<=48)return'🌫️안개';if(c<=57)return'🌦️이슬비';if(c<=67)return'🌧️비';
+  if(c<=77)return'❄️눈';if(c<=82)return'🌧️소나기';return'⛈️번개';
+}
+function isBadWx(c){return c>=61;}
+function wCls(w){return w<=7?'wind-ok':w<=10?'wind-warn':'wind-bad';}
+function wDesc(w){if(w<=3)return'✅ 최고 조건';if(w<=5)return'✅ 낚시 양호';if(w<=7)return'⚠️ 약간 강함';if(w<=10)return'⚠️ 낚시 고민';return'❌ 낚시 어려움';}
+function wIcon(w){if(w<=3)return'🟢';if(w<=5)return'🟢';if(w<=7)return'🟡';if(w<=10)return'🟠';return'🔴';}
+function estSeaT(lat,m){const b=lat>37?9:lat>35?13:lat>34?16:18;const s=[0,0,1,3,5,7,9,10,8,5,3,1];return(b+s[m]).toFixed(0);}
+function dirStr(d){return['북','북동','동','남동','남','남서','서','북서'][Math.round(d/45)%8]+'풍';}
+
+// ════════════════════════════════════════
+// TIDE
+// ════════════════════════════════════════
+function getLunarAge(){const n=new Date('2024-01-11T00:00:00Z');return(((Date.now()-n)/86400000)%29.53+29.53)%29.53;}
+function getLunarDay(){
+  // 양력→음력 변환 (근사): 2026-03-09 = 음력 1월 21일 기준 보정
+  const REF_SOLAR=new Date('2026-03-09T00:00:00+09:00');
+  const REF_LUNAR=21; // 음력 1월 21일
+  const today=new Date();today.setHours(0,0,0,0);
+  const diff=Math.round((today-REF_SOLAR)/86400000);
+  return((REF_LUNAR-1+diff)%29.53+29.53)%29.53+1; // 1~29.53
+}
+function getTideName(lunarDay){
+  // 한국 전통 물때: 음력날짜 직접 매핑 (바다타임 기준)
+  const t=['7물','8물','9물','10물','11물','12물','13물','조금','무시','1물','2물','3물','4물','5물','사리','8물','9물','10물','11물','12물','13물','조금','무시','1물','2물','3물','4물','5물','사리','8물'];
+  const idx=Math.round(lunarDay)-1;
+  return t[Math.max(0,Math.min(29,idx))]||'--';
+}
+function getTideStr(lunarDay){
+  // 조류세기: 사리(음력15,29일)=100%, 조금(음력8,22일)=10%
+  const d=Math.round(lunarDay);
+  const dist=Math.min(Math.abs(d-15),Math.abs(d-29),Math.abs(d-1));
+  return Math.min(100,Math.max(10,Math.round(dist/7*90+10)));
+}
+function setTideLbl(id){const d=getLunarDay();const el=document.getElementById(id);if(el)el.textContent=getTideName(d);}
+
+// ════════════════════════════════════════
+// RECOMMENDATION - 내만 위주, 서해/동해/남해 분산
+// ════════════════════════════════════════
+function scorePoint(pt){
+  const m = currentMonth;
+  const wx = pointWeathers[pt.id];
+
+  // 바람 10 초과 or 악천후 → 제외
+  if(wx && wx.wind > 10) return -1;
+  if(wx && isBadWx(wx.wcode)) return -1;
+
+  let score = 0;
+
+  // 어종 시즌 점수
+  score += pt.fish.filter(f=>FISH_DB[f]&&FISH_DB[f].season[m]>=1).length * 12;
+  score += pt.fish.filter(f=>FISH_DB[f]&&FISH_DB[f].peak&&FISH_DB[f].peak.includes(m)).length * 20;
+
+  // 낚시 스타일 가중치 (갯바위/서프/원투/찌낚시/루어 위주)
+  const coastStyles = ['갯바위','서프','원투','찌낚시','루어','에깅','캐스팅'];
+  const styleMatch = (pt.fishStyle||[]).filter(s=>coastStyles.includes(s)).length;
+  score += styleMatch * 8;
+
+  // 핫스팟
+  if(pt.hot) score += 12;
+
+  // 바람 보너스
+  if(wx){
+    if(wx.wind<=3) score+=22;
+    else if(wx.wind<=5) score+=16;
+    else if(wx.wind<=7) score+=8;
+  }
+
+  // 물때 점수 (몇물 기준 세분화)
+  const tideName = getTideName(getLunarDay());
+  const tideScore = {
+    '3물':20,'4물':20,'5물':20,'6물':18,  // 최적 (조류 활발, 입질 좋음)
+    '2물':14,'7물':14,                     // 양호
+    '1물':10,'8물':10,'9물':10,            // 보통
+    '사리':8,                              // 조류 너무 강해서 낚시 어려울 수 있음
+    '10물':6,'11물':6,'12물':6,'13물':6,   // 약한 조류
+    '조금':3,'무시':1                       // 조류 거의 없음
+  };
+  score += (tideScore[tideName] || 5);
+
+  return score;
+}
+
+// 지역 분산: 서해/남해/동해 각각 최대 2개 + 제주 1개 이하
+function buildRecommendList(count=4){
+  const scored = POINTS.map(pt=>({pt,score:scorePoint(pt)})).filter(x=>x.score>=0).sort((a,b)=>b.score-a.score);
+  const result = [];
+  const regionCount = {'서해':0,'남해':0,'동해':0,'제주':0};
+  const maxPerRegion = {'서해':2,'남해':2,'동해':2,'제주':1};
+
+  for(const s of scored){
+    const r = s.pt.region;
+    if((regionCount[r]||0) < (maxPerRegion[r]||2)){
+      result.push(s);
+      regionCount[r] = (regionCount[r]||0)+1;
+    }
+    if(result.length >= count) break;
+  }
+  // 부족하면 남은 것으로 채움
+  if(result.length < count){
+    for(const s of scored){
+      if(!result.includes(s)) result.push(s);
+      if(result.length >= count) break;
+    }
+  }
+  return result;
+}
+
+function buildRecChips(){
+  document.getElementById('rec-loading').style.display='none';
+  const chips = document.getElementById('rec-chips');
+  const list = buildRecommendList(4);
+  if(!list.length){ chips.innerHTML='<span style="font-size:10px;color:var(--hot);">⚠️ 전국 강풍/악천후</span>'; return; }
+  chips.innerHTML = list.map((s,i)=>{
+    const wx=pointWeathers[s.pt.id];
+    const wt=wx?` ${wx.wind.toFixed(1)}m/s`:'';
+    return`<div class="rec-chip ${i===0?'best':''}" onclick="flyToPoint('${s.pt.id}')">${i===0?'👑':i===1?'🥈':i===2?'🥉':'🎣'} ${s.pt.name}${wt}</div>`;
+  }).join('');
+}
+
+function openRecommendPanel(){
+  currentRecTab = 'today';
+  document.getElementById('rec-tab-today').classList.add('active');
+  document.getElementById('rec-tab-weekend').classList.remove('active');
+  document.getElementById('recommend-panel').classList.add('open');
+  renderTodayRec();
+}
+function closeRecommendPanel(){document.getElementById('recommend-panel').classList.remove('open');}
+
+// ─────────── 탭 전환 ───────────
+let currentRecTab = 'today';
+function switchRecTab(tab){
+  currentRecTab = tab;
+  document.getElementById('rec-tab-today').classList.toggle('active', tab==='today');
+  document.getElementById('rec-tab-weekend').classList.toggle('active', tab==='weekend');
+  if(tab==='today') renderTodayRec();
+  else renderWeekendRec();
+}
+
+// ─────────── 오늘 추천 렌더 (기존 로직 분리) ───────────
+function renderTodayRec(){
+  const body = document.getElementById('recommend-body');
+  const m = currentMonth;
+  const age = getLunarDay();
+  const tname = getTideName(age);
+  const list = buildRecommendList(6);
+  const bad = POINTS.map(pt=>({pt,score:scorePoint(pt),wx:pointWeathers[pt.id]})).filter(x=>x.score<0).slice(0,3);
+  body.innerHTML = buildTodayRecHTML(m, tname, list, bad);
+}
+
+function buildTodayRecHTML(m, tname, list, bad){
+  return `
+    <div style="background:var(--mint-light);border-radius:var(--radius);padding:11px 14px;margin-bottom:14px;font-size:11.5px;color:var(--gray-600);line-height:1.7;">
+      📅 <strong>${m+1}월</strong> · 🌊 <strong>${tname}</strong> · 내만/갯바위/서프 위주
+      <br>💨 <span style="color:var(--wind-ok);font-weight:700;">7m/s 이하</span> 추천 · <span style="color:var(--wind-bad);font-weight:700;">10m/s 초과·비</span> 제외 · 서해/남해/동해 분산
+    </div>
+    ${list.map((s,i)=>{
+      const wx=s.wx||pointWeathers[s.pt.id];
+      const wv=wx?wx.wind.toFixed(1):'--';
+      const wc=wx?wCls(wx.wind):'';
+      const sf=s.pt.fish.filter(f=>FISH_DB[f]&&FISH_DB[f].season[m]>=1);
+      const pf=s.pt.fish.filter(f=>FISH_DB[f]&&FISH_DB[f].peak&&FISH_DB[f].peak.includes(m));
+      const why=[];
+      if(pf.length) why.push('🔥 '+pf.join(', ')+' 피크');
+      if(s.pt.hot) why.push('⭐ 핫스팟');
+      if(wx&&wx.wind<=3) why.push('💨 바람 최적');
+      else if(wx&&wx.wind<=7) why.push('💨 바람 양호');
+      const tideName2=getTideName(getLunarDay());
+      const bestTides=['3물','4물','5물','6물'];
+      if(bestTides.includes(tideName2)) why.push('🌊 물때 최적');
+      const styleStr=(s.pt.fishStyle||[]).join(' · ');
+      if(!why.length) why.push('📍 시즌 포인트');
+      return`<div class="rec-spot-card rank-${i+1}" onclick="flyToPoint('${s.pt.id}')">
+        <div class="rsc-header">
+          <div class="rsc-rank">${i+1}</div>
+          <div style="flex:1;">
+            <div class="rsc-name">${s.pt.name}</div>
+            <div class="rsc-region">${s.pt.region} · ${styleStr}</div>
+            <div class="rsc-score-row">
+              <span style="font-size:9px;color:rgba(255,255,255,0.65);">추천도</span>
+              <div class="rsc-track"><div class="rsc-fill" style="width:${Math.min(100,s.score)}%"></div></div>
+              <span class="rsc-val">${Math.min(100,s.score)}점</span>
+              <span class="rsc-wind ${wc}">💨${wv}m/s</span>
+            </div>
+          </div>
+        </div>
+        <div class="rsc-body">
+          <div class="rsc-why">${why.join(' · ')}</div>
+          <div class="rsc-fish">${sf.map(f=>`<span class="rsc-fish-tag">🐟 ${f}</span>`).join('')}</div>
+        </div>
+      </div>`;
+    }).join('')}
+    ${bad.length?`<div style="font-size:11px;font-weight:700;color:var(--hot);margin:14px 0 8px;">❌ 오늘 가기 어려운 곳</div>
+    ${bad.map(s=>`<div class="rec-spot-card nogo"><div class="rsc-header"><div class="rsc-rank" style="font-size:18px;">✕</div><div><div class="rsc-name">${s.pt.name}</div><div class="rsc-region">${s.pt.region} · ${s.wx?'💨'+s.wx.wind.toFixed(1)+'m/s':''}</div></div></div></div>`).join('')}`:''}`;
+}
+
+// ─────────── 주말 추천 렌더 ───────────
+// 이번주 금/토/일 날짜 계산
+function getWeekendDates(){
+  const today = new Date();
+  const dow = today.getDay(); // 0=일,1=월...6=토
+  const days = [];
+  // 가장 가까운 금~일 (이번주 or 다음주)
+  // 금=5, 토=6, 일=0
+  const targets = [5,6,0]; // 금,토,일
+  for(const t of targets){
+    const diff = (t - dow + 7) % 7;
+    const d = new Date(today);
+    d.setDate(today.getDate() + (diff===0&&t!==dow?7:diff));
+    days.push(d);
+  }
+  // 오늘이 금/토/일이면 이번 주말 포함
+  return days;
+}
+
+function getLunarDayForDate(targetDate){
+  const REF_SOLAR = new Date('2026-03-09T00:00:00+09:00');
+  const REF_LUNAR = 21;
+  const t = new Date(targetDate); t.setHours(0,0,0,0);
+  const ref = new Date(REF_SOLAR); ref.setHours(0,0,0,0);
+  const diff = Math.round((t - ref) / 86400000);
+  return ((REF_LUNAR - 1 + diff) % 29.53 + 29.53) % 29.53 + 1;
+}
+
+function scorePointForDate(pt, wkWx){
+  const m = new Date().getMonth();
+  if(wkWx && wkWx.wind > 10) return -1;
+  if(wkWx && wkWx.wcode && isBadWx(wkWx.wcode)) return -1;
+  let score = 0;
+  score += pt.fish.filter(f=>FISH_DB[f]&&FISH_DB[f].season[m]>=1).length * 12;
+  score += pt.fish.filter(f=>FISH_DB[f]&&FISH_DB[f].peak&&FISH_DB[f].peak.includes(m)).length * 20;
+  const coastStyles = ['갯바위','서프','원투','찌낚시','루어','에깅','캐스팅'];
+  score += (pt.fishStyle||[]).filter(s=>coastStyles.includes(s)).length * 8;
+  if(pt.hot) score += 12;
+  if(wkWx){
+    if(wkWx.wind<=3) score+=22;
+    else if(wkWx.wind<=5) score+=16;
+    else if(wkWx.wind<=7) score+=8;
+  }
+  return score;
+}
+
+// 주말 날씨 예보 캐시
+const weekendForecast = {}; // ptId -> [{date, wind, wcode, temp}]
+
+async function fetchWeekendForecast(pt){
+  if(weekendForecast[pt.id]) return;
+  try{
+    const wkDates = getWeekendDates();
+    const startDate = wkDates[0].toISOString().split('T')[0];
+    const endDate = wkDates[2].toISOString().split('T')[0];
+    const r = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${pt.lat}&longitude=${pt.lng}&daily=windspeed_10m_max,weathercode&wind_speed_unit=ms&timezone=Asia/Seoul&start_date=${startDate}&end_date=${endDate}`);
+    if(!r.ok) return;
+    const d = await r.json();
+    if(!d.daily) return;
+    weekendForecast[pt.id] = d.daily.time.map((t,i)=>({
+      date: t,
+      wind: parseFloat(d.daily.windspeed_10m_max[i])||0,
+      wcode: d.daily.weathercode[i]||0
+    }));
+  }catch(e){}
+}
+
+async function renderWeekendRec(){
+  const body = document.getElementById('recommend-body');
+  body.innerHTML = '<div style="text-align:center;padding:30px;color:var(--gray-600);">⏳ 주말 날씨 불러오는 중...</div>';
+
+  // 전체 포인트 주말 예보 로드
+  await Promise.all(POINTS.map(fetchWeekendForecast));
+
+  const wkDates = getWeekendDates();
+  const dayLabels = ['금요일','토요일','일요일'];
+  const dayEmojis = ['🎣','🌊','🏖️'];
+  const m = new Date().getMonth();
+
+  let html = '';
+
+  for(let di=0; di<wkDates.length; di++){
+    const date = wkDates[di];
+    const dateStr = date.toISOString().split('T')[0];
+    const lunarDay = getLunarDayForDate(date);
+    const tname = getTideName(lunarDay);
+    const mm = date.getMonth()+1;
+    const dd = date.getDate();
+
+    // 이 날짜에 대한 포인트 점수 계산
+    const scored = POINTS.map(pt=>{
+      const fc = weekendForecast[pt.id];
+      const dayFc = fc ? fc.find(f=>f.date===dateStr) : null;
+      return {pt, score: scorePointForDate(pt, dayFc), wx: dayFc};
+    }).filter(x=>x.score>=0).sort((a,b)=>b.score-a.score);
+
+    // 지역 분산 (최대 3개)
+    const result=[];
+    const rc={'서해':0,'남해':0,'동해':0,'제주':0};
+    const mx={'서해':1,'남해':1,'동해':1,'제주':1};
+    for(const s of scored){
+      const r=s.pt.region;
+      if((rc[r]||0)<(mx[r]||1)){result.push(s);rc[r]=(rc[r]||0)+1;}
+      if(result.length>=3) break;
+    }
+
+    const windOk = result.length>0;
+    html += `<div class="wk-day-card">
+      <div class="wk-day-header">
+        <span style="font-size:18px;">${dayEmojis[di]}</span>
+        <div>
+          <div class="wk-day-label">${dayLabels[di]} ${mm}/${dd}</div>
+          <div style="font-size:10px;color:rgba(255,255,255,0.75);">🌊 ${tname} · 음력 ${Math.round(lunarDay)}일</div>
+        </div>
+        <div class="wk-day-tide">${windOk?'✅ 출조 가능':'⛔ 출조 주의'}</div>
+      </div>`;
+
+    if(result.length===0){
+      html += `<div style="padding:12px 14px;font-size:12px;color:var(--hot);">⛔ 강풍·악천후로 추천 포인트 없음</div>`;
+    } else {
+      html += result.map((s,i)=>{
+        const wv=s.wx?s.wx.wind.toFixed(1):'--';
+        const wc=s.wx?wCls(s.wx.wind):'';
+        const pf=s.pt.fish.filter(f=>FISH_DB[f]&&FISH_DB[f].peak&&FISH_DB[f].peak.includes(m));
+        const sf=s.pt.fish.filter(f=>FISH_DB[f]&&FISH_DB[f].season[m]>=1);
+        return `<div class="rec-spot-card rank-${i+1}" style="margin:6px;border-radius:10px;" onclick="flyToPoint('${s.pt.id}');closeRecommendPanel();">
+          <div class="rsc-header">
+            <div class="rsc-rank">${i+1}</div>
+            <div style="flex:1;">
+              <div class="rsc-name">${s.pt.name}</div>
+              <div class="rsc-region">${s.pt.region}</div>
+              <div class="rsc-score-row">
+                <div class="rsc-track"><div class="rsc-fill" style="width:${Math.min(100,s.score)}%"></div></div>
+                <span class="rsc-val">${Math.min(100,s.score)}점</span>
+                <span class="rsc-wind ${wc}">💨${wv}m/s</span>
+              </div>
+            </div>
+          </div>
+          <div class="rsc-body">
+            ${pf.length?`<div style="font-size:11px;color:#FFD54F;font-weight:700;">🔥 ${pf.join(', ')} 피크</div>`:''}
+            <div class="rsc-fish">${sf.slice(0,4).map(f=>`<span class="rsc-fish-tag">🐟 ${f}</span>`).join('')}</div>
+          </div>
+        </div>`;
+      }).join('');
+    }
+    html += '</div>';
+  }
+
+  body.innerHTML = `<div style="font-size:11px;color:var(--gray-500);padding:8px 2px 10px;">📡 Open-Meteo 7일 예보 기준 · 클릭하면 지도로 이동</div>${html}`;
+}
+
+function flyToPoint(id){
+  closeRecommendPanel();
+  const pt=POINTS.find(p=>p.id===id); if(!pt) return;
+  map.flyTo([pt.lat,pt.lng],12,{duration:1.2});
+  setTimeout(()=>openDrawer(id),1300);
+}
+
+// ════════════════════════════════════════
+// MONTHLY FISH BAR
+// ════════════════════════════════════════
+function renderFishBar(){
+  const m = currentMonth;
+  document.getElementById('fish-bar-month').textContent = (m+1)+'월';
+  // 보마스 주력 어종 순서 (앞으로 배치)
+  const PRIORITY = ['농어','광어','우럭','조기','백조기','갈치','무늬오징어','갑오징어','쭈꾸미','가자미','전어'];
+  const allFish = Object.entries(FISH_DB).filter(([fn,f])=>f.season[m]>=1);
+  allFish.sort((a,b)=>{
+    const ai = PRIORITY.indexOf(a[0]);
+    const bi = PRIORITY.indexOf(b[0]);
+    const ap = a[1].peak&&a[1].peak.includes(m)?1:0;
+    const bp = b[1].peak&&b[1].peak.includes(m)?1:0;
+    // 우선순위: 주력+피크 > 주력+시즌 > 기타+피크 > 기타+시즌
+    const aScore = (ai>=0?100:0) + ap*10;
+    const bScore = (bi>=0?100:0) + bp*10;
+    if(bScore !== aScore) return bScore - aScore;
+    if(ai>=0 && bi>=0) return ai - bi; // 둘 다 주력이면 순서대로
+    return 0;
+  });
+  document.getElementById('fish-chips').innerHTML = allFish.map(([fn,f])=>{
+    const isPeak = f.peak&&f.peak.includes(m);
+    const isPriority = PRIORITY.includes(fn);
+    return`<div class="fish-chip ${isPeak?'peak':''} ${isPriority?'priority':''} ${activeFilter===fn?'active':''}" onclick="filterByFish('${fn}')">${f.emoji} ${fn}</div>`;
+  }).join('');
+}
+
+function filterByFish(fn){
+  if(activeFilter===fn){ activeFilter=null; } else { activeFilter=fn; }
+  // 칩 active 상태 업데이트
+  document.querySelectorAll('.fish-chip').forEach(c=>{
+    c.classList.toggle('active', c.textContent.trim().includes(fn) && activeFilter===fn);
+  });
+  updateMarkers();
+  if(activeFilter){
+    // 해당 어종 포인트들로 지도 이동
+    const pts = POINTS.filter(p=>p.fish.includes(activeFilter));
+    if(pts.length){
+      const lats=pts.map(p=>p.lat), lngs=pts.map(p=>p.lng);
+      map.fitBounds([[Math.min(...lats)-0.5,Math.min(...lngs)-0.5],[Math.max(...lats)+0.5,Math.max(...lngs)+0.5]]);
+    }
+    showSnackbar(`🐟 ${activeFilter} 포인트 ${pts.length}곳 표시`);
+  } else {
+    showSnackbar('전체 포인트 표시');
+  }
+}
+
+// ════════════════════════════════════════
+// MINI POPUP
+// ════════════════════════════════════════
+function showMiniPopup(pt,marker){
+  const m=currentMonth;
+  const wx=pointWeathers[pt.id];
+  const wv=wx?wx.wind.toFixed(1):'...';
+  const wvc=wx?wCls(wx.wind):'';
+  var fishH='';for(var _fi=0;_fi<pt.fish.length;_fi++){var _fn=pt.fish[_fi];var _on=FISH_DB[_fn]&&FISH_DB[_fn].season[m]>=1;var _peak=FISH_DB[_fn]&&FISH_DB[_fn].peak&&FISH_DB[_fn].peak.includes(m);fishH+=('<span class="mini-fish-tag '+(_peak?'peak':_on?'':'off')+'">'+(_peak?'⭐ ':_on?'🟢 ':'')+_fn+'</span>');}
+  const html=`<div class="mini-popup">
+    <div class="mini-popup-header"><div class="mini-popup-name">${pt.hot?'🔥 ':''}${pt.name}</div><div class="mini-popup-region">${pt.region} · ${pt.type}</div></div>
+    <div class="mini-popup-body">
+      <div class="mini-stats">
+        <div class="mini-stat"><div class="mini-stat-lbl">기온</div><div class="mini-stat-val">${wx?wx.temp.toFixed(0)+'°C':'...'}</div></div>
+        <div class="mini-stat"><div class="mini-stat-lbl">파고</div><div class="mini-stat-val">${wx?wx.wave.toFixed(1)+'m':'...'}</div></div>
+        <div class="mini-stat"><div class="mini-stat-lbl">바람</div><div class="mini-stat-val ${wvc}">${wv}m/s</div></div>
+      </div>
+      <div style="font-size:10px;color:#9BA5B0;margin-bottom:5px;">${m+1}월 시즌 어종</div>
+      <div class="mini-fish">${fishH||'<span style="font-size:11px;color:#9BA5B0;">이달 주요 어종 없음</span>'}</div>
+      <button class="mini-detail-btn" onclick="openDrawer('${pt.id}')">상세 정보 보기 →</button>
+    </div>
+  </div>`;
+  marker.bindPopup(L.popup({maxWidth:260,minWidth:248,closeButton:false}).setContent(html)).openPopup();
+  if(!wx) fetchPtWx(pt);
+}
+
+// ════════════════════════════════════════
+// DRAWER
+// ════════════════════════════════════════
+function openDrawer(id){
+  map.closePopup();
+  const pt=POINTS.find(p=>p.id===id)||myPoints.find(p=>p.id===id); if(!pt) return;
+  selectedPoint=pt;
+  document.getElementById('d-name').textContent=(pt.hot?'🔥 ':'')+pt.name;
+  document.getElementById('d-region').textContent=pt.region;
+  document.getElementById('d-type-badge').textContent=pt.type;
+  loadDrawerWx(pt);
+  renderDepthInfo(pt);
+  renderTideTl(pt);
+  renderFishGrid(pt);
+  document.getElementById('d-info').textContent=pt.info;
+  document.getElementById('d-tags').innerHTML=(pt.tags||[]).map(t=>`<span style="background:var(--sky);border:1px solid var(--sea-light);color:var(--sea);border-radius:7px;padding:4px 9px;font-size:10.5px;font-weight:600;">${t}</span>`).join('');
+  document.getElementById('drawer').classList.add('open');
+  document.getElementById('overlay').classList.add('show');
+}
+function closeDrawer(){document.getElementById('drawer').classList.remove('open');document.getElementById('overlay').classList.remove('show');}
+
+async function loadDrawerWx(pt){
+  let wx=pointWeathers[pt.id];
+  if(!wx){await fetchPtWx(pt); wx=pointWeathers[pt.id];}
+  if(!wx) return;
+  document.getElementById('d-sky').textContent=wCode(wx.wcode);
+  document.getElementById('d-temp').textContent=wx.temp.toFixed(1)+'°C';
+  document.getElementById('d-wave').textContent=wx.wave.toFixed(1)+'m';
+  document.getElementById('d-seatemp').textContent=estSeaT(pt.lat,currentMonth)+'°C';
+  const w=wx.wind;
+  const vEl=document.getElementById('d-wind-val');
+  vEl.textContent=w.toFixed(1); vEl.className='wind-val-big '+wCls(w);
+  document.getElementById('d-wind-desc').textContent=wDesc(w);
+  document.getElementById('d-wind-desc').style.color=w<=7?'var(--wind-ok)':w<=10?'var(--wind-warn)':'var(--wind-bad)';
+  document.getElementById('d-wind-dir').textContent=wx.windDir?dirStr(wx.windDir):'';
+  document.getElementById('d-wind-icon').textContent=wIcon(w);
+  document.getElementById('d-wind-cond-lbl').textContent=w<=7?'낚시 가능':w<=10?'고민됨':'어려움';
+}
+
+// ════════════════════════════════════════
+// DEPTH & SPOT INFO
+// ════════════════════════════════════════
+function renderDepthInfo(pt){
+  const d=pt.depth||{};
+  const depthGrid=document.getElementById('d-depth-grid');
+  const keys=Object.keys(d);
+  depthGrid.innerHTML=keys.map(k=>`
+    <div class="depth-item">
+      <div class="depth-icon">🌊</div>
+      <div class="depth-lbl">${k}</div>
+      <div class="depth-val">${d[k]}</div>
+    </div>`).join('')+(keys.length===0?'<div style="font-size:12px;color:var(--gray-400);padding:4px;">수심 정보 없음</div>':'');
+  const spotTags=document.getElementById('d-spot-tags');
+  spotTags.innerHTML=(pt.highlights||[]).map(h=>`<span class="spot-tag ${pt.hot?'hot':''}">${h}</span>`).join('');
+}
+
+// ════════════════════════════════════════
+// TIDE TIMELINE
+// ════════════════════════════════════════
+function renderTideTl(pt){
+  const age=getLunarDay();
+  const tname=getTideName(age);
+  const str=getTideStr(age);
+  document.getElementById('d-tide-name').textContent=tname;
+  document.getElementById('d-tide-sub').textContent=`음력 ${Math.min(30,Math.max(1,Math.round(age)))}일 · ${str>=70?'조류 강함 ⚡':str>=40?'조류 보통':'조류 약함'}`;
+  const pEl=document.getElementById('d-tide-pct');
+  pEl.textContent=str+'%';
+  // 조류 세기 바 채우기
+  const fillEl=document.getElementById('d-tide-fill');
+  if(fillEl){fillEl.style.width=str+'%';fillEl.style.background=str>=70?'linear-gradient(90deg,#FF6B6B,#FF8E53)':str>=40?'linear-gradient(90deg,#42A5F5,#00E5FF)':'linear-gradient(90deg,#78909C,#B0BEC5)';}
+
+  const lo=(pt.lng-126)*0.4;
+  const la=(age%14.77)/14.77*12.4;
+  const base=((6+lo+la)%12.4+12.4)%12.4;
+  const tides=[
+    {type:'high',h:base,ht:280+Math.round(str*0.8)},
+    {type:'low', h:(base+6.2)%24,ht:80+Math.round((100-str)*0.4)},
+    {type:'high',h:(base+12.4)%24,ht:260+Math.round(str*0.7)},
+    {type:'low', h:(base+18.6)%24,ht:90+Math.round((100-str)*0.3)},
+  ].sort((a,b)=>a.h-b.h);
+
+  const m=currentMonth;
+  const sr=5.5+[0.8,0.5,0.1,-0.3,-0.6,-0.7,-0.5,-0.1,0.2,0.5,0.8,1.0][m];
+  const ss=17.8+[0.1,0.4,0.7,1.1,1.4,1.5,1.3,1.0,0.6,0.2,0,0][m];
+  const bar=document.getElementById('tl-bar');
+  bar.querySelectorAll('.tl-tide-marker,.tl-sun-marker').forEach(e=>e.remove());
+  const nowH=new Date().getHours()+new Date().getMinutes()/60;
+  document.getElementById('tl-now').style.left=(nowH/24*100)+'%';
+  const sz=document.getElementById('tl-sun-zone');
+  sz.style.left=(sr/24*100)+'%'; sz.style.width=((ss-sr)/24*100)+'%';
+  // 일출/일몰/현재시각 라벨 업데이트
+  const fmtH=h=>`${String(Math.floor(h)).padStart(2,'0')}:${String(Math.round((h%1)*60)).padStart(2,'0')}`;
+  const srEl=document.getElementById('d-sunrise-lbl');
+  const ssEl=document.getElementById('d-sunset-lbl');
+  const nowLbl=document.getElementById('d-now-lbl');
+  if(srEl) srEl.textContent='☀️ '+fmtH(sr);
+  if(ssEl) ssEl.textContent='🌙 '+fmtH(ss);
+  if(nowLbl) nowLbl.textContent='▼ '+fmtH(nowH);
+  [{h:sr,e:'🌅'},{h:ss,e:'🌇'}].forEach(({h,e})=>{
+    const s=document.createElement('span');s.className='tl-sun-marker';s.textContent=e;s.style.left=(h/24*100)+'%';bar.appendChild(s);
+  });
+  tides.forEach(t=>{
+    const d=document.createElement('div');d.className='tl-tide-marker';d.style.left=(t.h/24*100)+'%';
+    d.innerHTML=`<div class="tl-dot ${t.type}"></div><div class="tl-tide-lbl">${t.type==='high'?'만':'간'}</div>`;
+    bar.appendChild(d);
+  });
+  const fmt=h=>`${String(Math.floor(h)).padStart(2,'0')}:${String(Math.round((h%1)*60)).padStart(2,'0')}`;
+  document.getElementById('tide-detail-grid').innerHTML=tides.map(t=>`
+    <div class="tide-detail-item" style="background:rgba(255,255,255,0.08);border-radius:10px;padding:9px 5px;text-align:center;">
+      <div class="tdi-type" style="color:rgba(255,255,255,0.5);">${t.type==='high'?'🔺 만조':'🔻 간조'}</div>
+      <div class="tdi-time" style="font-size:15px;font-weight:800;color:white;margin:4px 0;">${fmt(t.h)}</div>
+      <div class="tdi-h ${t.type}" style="font-size:11px;font-weight:700;color:${t.type==='high'?'#00E5FF':'#FFD54F'};">${t.ht}cm</div>
+    </div>`).join('');
+}
+
+// ════════════════════════════════════════
+// FISH GRID
+// ════════════════════════════════════════
+function renderFishGrid(pt){
+  const m=currentMonth;
+  document.getElementById('d-fish-grid').innerHTML=pt.fish.map(fn=>{
+    const f=FISH_DB[fn]; if(!f) return '';
+    const on=f.season[m]; const pk=f.peak&&f.peak.includes(m);
+    const cal=f.season.map((s,i)=>`<div class="s-m"><div class="s-m-lbl">${i+1}</div><div class="s-block ${f.peak&&f.peak.includes(i)?'peak':s?'on':''}"></div></div>`).join('');
+    return`<div class="fish-card ${on?'season-on':''}">
+      <div class="fish-header"><div class="fish-name">${f.emoji} ${fn}</div><span class="fish-badge ${pk?'peak':on?'on':'off'}">${pk?'🔥피크':on?'시즌':'비시즌'}</span></div>
+      <div class="fish-seatemp">🌡 추천 수온 ${f.seaTemp}</div>
+      <div class="fish-info">${f.habitat} · ${f.depth}<br>${f.tips}</div>
+      <div class="season-cal">${cal}</div>
+      <div class="tackle-tags">${(f.tackle||[]).map(t=>`<span class="tackle-tag">${t}</span>`).join('')}</div>
+    </div>`;
+  }).join('');
+}
+
+// ════════════════════════════════════════
+// SEARCH
+// ════════════════════════════════════════
+let searchOpen=false;
+function toggleSearch(){searchOpen=!searchOpen;document.getElementById('search-box').classList.toggle('open',searchOpen);if(searchOpen)document.getElementById('search-input').focus();else{document.getElementById('search-input').value='';document.getElementById('search-results').innerHTML='';}}
+function doSearch(q){
+  const r=document.getElementById('search-results');
+  if(!q.trim()){r.innerHTML='';return;}
+  const res=POINTS.filter(p=>p.name.includes(q)||p.region.includes(q)||p.fish.some(f=>f.includes(q))||(p.tags||[]).some(t=>t.includes(q)));
+  r.innerHTML=res.length?res.map(p=>`<div class="si" onclick="selSearch('${p.id}')"><span style="font-size:17px;">${p.hot?'🔥':'🎣'}</span><div><div class="si-name">${p.name}</div><div class="si-sub">${p.region} · ${p.fish.slice(0,3).join(', ')}</div></div></div>`).join(''):'<div style="padding:12px 15px;color:#9BA5B0;font-size:12px;">결과 없음</div>';
+}
+function selSearch(id){toggleSearch();flyToPoint(id);}
+
+// ════════════════════════════════════════
+// ADD MY POINT
+// ════════════════════════════════════════
+function toggleAddPoint(){addingPoint=!addingPoint;const fab=document.getElementById('fab');fab.textContent=addingPoint?'✕':'📌';fab.classList.toggle('cancel',addingPoint);showSnackbar(addingPoint?'지도를 클릭해서 포인트 추가':'취소');}
+function promptAddMyPoint(ll){
+  const n=prompt('포인트 이름:'); if(!n){addingPoint=false;document.getElementById('fab').textContent='📌';document.getElementById('fab').classList.remove('cancel');return;}
+  const memo=prompt('메모(선택):')||'';
+  const pt={id:'my_'+Date.now(),name:n,lat:ll.lat,lng:ll.lng,memo};
+  myPoints.push(pt); localStorage.setItem('myPoints',JSON.stringify(myPoints));
+  addMyPointMarker(pt); addingPoint=false;
+  document.getElementById('fab').textContent='📌'; document.getElementById('fab').classList.remove('cancel');
+  loadRecordSpots(); showSnackbar('📌 '+n+' 추가됨');
+}
+
+// ════════════════════════════════════════
+// RECORD
+// ════════════════════════════════════════
+function openRecordPanel(){document.getElementById('record-panel').classList.add('open');document.getElementById('rec-date').value=new Date().toISOString().slice(0,10);renderRecords();}
+function closeRecordPanel(){document.getElementById('record-panel').classList.remove('open');}
+function loadRecordSpots(){const sel=document.getElementById('rec-spot');sel.innerHTML='<option value="">선택</option>'+[...POINTS,...myPoints].map(p=>`<option value="${p.id}">${p.name} (${p.region||'내 포인트'})</option>`).join('');}
+function saveRecord(){
+  const sid=document.getElementById('rec-spot').value,dt=document.getElementById('rec-date').value;
+  if(!dt||!sid){showSnackbar('날짜와 포인트를 선택해주세요');return;}
+  const sp=[...POINTS,...myPoints].find(p=>p.id===sid);
+  records.unshift({id:Date.now(),date:dt,spotId:sid,spotName:sp?.name||'--',catch:document.getElementById('rec-catch').value,memo:document.getElementById('rec-memo').value});
+  localStorage.setItem('records',JSON.stringify(records));
+  ['rec-catch','rec-memo'].forEach(i=>document.getElementById(i).value='');
+  renderRecords(); showSnackbar('✅ 기록 저장됨');
+}
+function renderRecords(){
+  const l=document.getElementById('record-list');
+  if(!records.length){l.innerHTML='<div class="empty-state"><div class="empty-icon">📔</div><div class="empty-text">아직 기록이 없어요<br>첫 낚시 기록을 남겨보세요!</div></div>';return;}
+  l.innerHTML=records.map(r=>{const d=new Date(r.date);return`<div class="record-card"><div class="rcd-badge"><div class="rcd-m">${d.getMonth()+1}월</div><div class="rcd-d">${d.getDate()}</div></div><div class="rcd-info"><div class="rcd-spot">📍 ${r.spotName}</div>${r.catch?`<div class="rcd-catch">🐟 ${r.catch}</div>`:''}${r.memo?`<div class="rcd-memo">${r.memo}</div>`:''}</div><button class="rcd-del" onclick="delRecord(${r.id})">🗑</button></div>`;}).join('');
+}
+function delRecord(id){if(!confirm('삭제?'))return;records=records.filter(r=>r.id!==id);localStorage.setItem('records',JSON.stringify(records));renderRecords();showSnackbar('삭제됨');}
+
+// ════════════════════════════════════════
+// MONTH
+// ════════════════════════════════════════
+function initMonthGrid(){document.getElementById('month-grid').innerHTML=Array.from({length:12},(_,i)=>`<button class="mm-btn ${i===currentMonth?'active':''}" onclick="selMonth(${i})">${i+1}월</button>`).join('');}
+function openMonthModal(){document.getElementById('month-modal').classList.add('open');}
+function closeMonthModal(){document.getElementById('month-modal').classList.remove('open');}
+function selMonth(m){
+  currentMonth=m;
+  updateMonthLabel();
+  closeMonthModal();
+  activeFilter=null; // 월 바뀌면 어종필터 초기화
+  renderFishBar();
+  updateMarkers();
+  buildRecChips();
+  if(selectedPoint) renderFishGrid(selectedPoint);
+  document.querySelectorAll('.mm-btn').forEach((b,i)=>b.classList.toggle('active',i===m));
+}
+function updateMonthLabel(){document.getElementById('month-label').textContent=(currentMonth+1)+'월';}
+
+// ════════════════════════════════════════
+// UTILS
+// ════════════════════════════════════════
+function showMap(){document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));document.getElementById('tab-map').classList.add('active');}
+function showSnackbar(msg){const s=document.getElementById('snackbar');s.textContent=msg;s.classList.add('show');setTimeout(()=>s.classList.remove('show'),2500);}
+// tide label placeholder (strip에 물때 없음)
+function setTideLbl(){}
+</script>
+
+  <script>
+    if('serviceWorker' in navigator){
+      window.addEventListener('load', ()=>{
+        navigator.serviceWorker.register('sw.js').catch(()=>{});
+      });
+    }
+    // 홈화면 추가 프롬프트
+    let deferredPrompt;
+    window.addEventListener('beforeinstallprompt', e=>{
+      e.preventDefault();
+      deferredPrompt = e;
+      const btn = document.getElementById('install-btn');
+      if(btn) btn.style.display='flex';
+    });
+    function installApp(){
+      if(deferredPrompt){
+        deferredPrompt.prompt();
+        deferredPrompt.userChoice.then(()=>{ deferredPrompt=null; });
+        const btn = document.getElementById('install-btn');
+        if(btn) btn.style.display='none';
+      }
+    }
+    window.addEventListener('appinstalled', ()=>{
+      const btn = document.getElementById('install-btn');
+      if(btn) btn.style.display='none';
+    });
+  </script>
+</body>
+</html>
