@@ -1156,11 +1156,33 @@ async function fetchMyWx(lat,lng,label){
 const KHOA_KEY = 'a14286461c28ef6ad768bc83c3322408f8e20eb18edec80fb01752f5e085e53a';
 // CORS 프록시 (브라우저에서 직접 호출 불가한 API 우회)
 // CORS 프록시 (무료, 안정적)
-const CORS_PROXY = 'https://api.allorigins.win/raw?url=';
+// CORS 프록시 목록 (순서대로 시도)
+const CORS_PROXIES = [
+  'https://thingproxy.freeboard.io/fetch/',
+  'https://api.allorigins.win/raw?url=',
+  'https://corsproxy.io/?url=',
+];
+
+// 프록시를 순차적으로 시도하는 fetch 헬퍼
 async function proxyFetch(url){
-  const r = await fetch(CORS_PROXY + encodeURIComponent(url));
-  if(!r.ok) throw new Error('HTTP '+r.status);
-  return r;
+  let lastErr;
+  for(const proxy of CORS_PROXIES){
+    try{
+      // allorigins는 encodeURIComponent 필요, 나머지는 직접 붙이기
+      const proxyUrl = proxy.includes('allorigins')
+        ? proxy + encodeURIComponent(url)
+        : proxy + url;
+      const r = await fetch(proxyUrl, {signal: AbortSignal.timeout(8000)});
+      if(r.ok){
+        // allorigins 오류 응답 체크
+        const text = await r.text();
+        if(text.includes('"error"') && text.includes('Free usage')) continue;
+        // 텍스트를 Response 객체로 재변환
+        return new Response(text, {status:200, headers:{'Content-Type':'application/json'}});
+      }
+    }catch(e){ lastErr=e; }
+  }
+  throw lastErr||new Error('모든 프록시 실패');
 }
 
 const TIDE_STATIONS = {
