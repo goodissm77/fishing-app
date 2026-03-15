@@ -1219,6 +1219,33 @@ async function fetchKhoaTide(stationCode){
   }
 }
 
+async function fetchKhoaTideTimeSeries(stationCode){
+  // 조석예보(시계열) - 조위 곡선 그래프용
+  if(!KHOA_KEY||KHOA_KEY==='YOUR_API_KEY') return null;
+  try{
+    const url=CORS_PROXY+'https://apis.data.go.kr/1192136/tideFcstTime/getTideFcstTime'
+      +'?ServiceKey='+encodeURIComponent(KHOA_KEY)
+      +'&ObsCode='+stationCode
+      +'&Date='+getTodayStr()
+      +'&ResultType=json';
+    const r=await fetch(url);
+    if(!r.ok){ console.warn('조석시계열 API '+r.status, stationCode); return null; }
+    const d=await r.json();
+    const items=d?.result?.data||d?.response?.body?.items?.item||[];
+    const arr=Array.isArray(items)?items:(items?[items]:[]);
+    // 시간별 조위 데이터
+    const series=arr.map(item=>{
+      const time=(item.obs_time||item.obsTime||'').toString();
+      const parts=time.split(':');
+      const h=parseInt(parts[0]||0)+parseInt(parts[1]||0)/60;
+      const level=parseFloat(item.tide_level||item.tideLevel||item.wl||0);
+      return {h, level};
+    }).filter(d=>d.level!==0);
+    if(series.length>0) console.log('조석시계열 성공:', stationCode, series.length+'개');
+    return series.length>0?series:null;
+  }catch(e){ console.warn('조석시계열 오류:', stationCode, e.message); return null; }
+}
+
 async function fetchKhoaCurrent(stationCode){
   // 조류예보(시계열) API
   if(!KHOA_KEY||KHOA_KEY==='YOUR_API_KEY') return null;
@@ -1263,7 +1290,10 @@ async function fetchKhoaSeaTemp(stationCode){
   if(!KHOA_KEY||KHOA_KEY==='YOUR_API_KEY') return null;
   try{
     const url=CORS_PROXY+'https://apis.data.go.kr/1192136/surveyWaterTemp/getSurveyWaterTemp'
-      +'?ServiceKey='+KHOA_KEY+'&ObsCode='+stationCode+'&ResultType=json';
+      +'?ServiceKey='+encodeURIComponent(KHOA_KEY)
+      +'&ObsCode='+stationCode
+      +'&ResultType=json'
+      +'&numOfRows=1&pageNo=1';
     const r=await fetch(url);
     const d=await r.json();
     const items=d?.result?.data||[];
@@ -1277,7 +1307,7 @@ async function fetchKhoaFishIdx(pt){
   if(!KHOA_KEY||KHOA_KEY==='YOUR_API_KEY') return null;
   try{
     const url=CORS_PROXY+'https://apis.data.go.kr/1192136/fcstFishingv2/getFcstFishingv2'
-      +'?serviceKey='+KHOA_KEY+'&PageNo=1&numOfRows=3&resultType=json'
+      +'?serviceKey='+encodeURIComponent(KHOA_KEY)+'&PageNo=1&numOfRows=3&resultType=json'
       +'&searchYmd='+getTodayStr()+'&obsLon='+pt.lng.toFixed(4)+'&obsLat='+pt.lat.toFixed(4);
     const r=await fetch(url);
     const d=await r.json();
@@ -1289,14 +1319,16 @@ async function fetchKhoaFishIdx(pt){
 }
 
 // 조류 데이터 캐시
-const khoaCurrentCache = {}; // stationCode → {speed, dir, time}
+const khoaCurrentCache = {};
+// 조석 시계열 캐시
+const khoaTideSeriesCache = {}; // stationCode → {speed, dir, time}
 
 // ── 실측 풍향/풍속 API ──
 async function fetchKhoaWind(stationCode){
   if(!KHOA_KEY||KHOA_KEY==='YOUR_API_KEY') return null;
   try{
     const url=CORS_PROXY+'https://apis.data.go.kr/1192136/surveyWind/getSurveyWind'
-      +'?ServiceKey='+KHOA_KEY+'&ObsCode='+stationCode+'&ResultType=json';
+      +'?ServiceKey='+encodeURIComponent(KHOA_KEY)+'&ObsCode='+stationCode+'&ResultType=json';
     const r=await fetch(url);
     const d=await r.json();
     const items=d?.result?.data||[];
@@ -1316,18 +1348,22 @@ async function fetchKhoaWave(stationCode){
   if(!KHOA_KEY||KHOA_KEY==='YOUR_API_KEY') return null;
   try{
     const url=CORS_PROXY+'https://apis.data.go.kr/1192136/noonWave/getNoonWave'
-      +'?ServiceKey='+KHOA_KEY+'&ObsCode='+stationCode+'&ResultType=json';
+      +'?ServiceKey='+encodeURIComponent(KHOA_KEY)
+      +'&ObsCode='+stationCode
+      +'&ResultType=json'
+      +'&numOfRows=1&pageNo=1';
     const r=await fetch(url);
+    if(!r.ok){ console.warn('파랑 API '+r.status, stationCode); return null; }
     const d=await r.json();
-    const items=d?.result?.data||[];
+    const items=d?.result?.data||d?.response?.body?.items?.item||[];
     const item=Array.isArray(items)?items[0]:items;
     if(item){
-      return {
-        height: parseFloat(item.wave_height||item.waveHeight||0),
-        period: parseFloat(item.wave_period||item.wavePeriod||0)
-      };
+      const height=parseFloat(item.wave_height||item.waveHeight||item.wvht||0);
+      const period=parseFloat(item.wave_period||item.wavePeriod||item.wvpd||0);
+      if(height>0) console.log('파랑 성공:', stationCode, height+'m');
+      return height>0?{height,period}:null;
     }
-  }catch(e){}
+  }catch(e){ console.warn('파랑 오류:', stationCode, e.message); }
   return null;
 }
 
@@ -1336,7 +1372,7 @@ async function fetchKhoaTideFlow(stationCode){
   if(!KHOA_KEY||KHOA_KEY==='YOUR_API_KEY') return null;
   try{
     const url=CORS_PROXY+'https://apis.data.go.kr/1192136/crntFcstFldEbb/getCrntFcstFldEbb'
-      +'?ServiceKey='+KHOA_KEY
+      +'?ServiceKey='+encodeURIComponent(KHOA_KEY)
       +'&ObsCode='+stationCode
       +'&Date='+getTodayStr()
       +'&ResultType=json';
@@ -1397,19 +1433,21 @@ async function fetchAllKhoa(){
   await Promise.all([
     // 관측소별: 조석+수온+조류+파랑+바람+창낙조 병렬 호출
     ...codes.map(async code=>{
-      const [tide, seaT, current, wave, wind, tideFlow]=await Promise.all([
+      const [tide, seaT, current, wave, wind, tideFlow, tideSeries]=await Promise.all([
         fetchKhoaTide(code),
         fetchKhoaSeaTemp(code),
         fetchKhoaCurrent(code),
         fetchKhoaWave(code),
         fetchKhoaWind(code),
-        fetchKhoaTideFlow(code)
+        fetchKhoaTideFlow(code),
+        fetchKhoaTideTimeSeries(code)
       ]);
-      if(tide)     khoaTideCache[code]    ={...tide,seaTemp:seaT,date:getTodayStr()};
-      if(current)  khoaCurrentCache[code] =current;
-      if(wave)     khoaWaveCache[code]    =wave;
-      if(wind)     khoaWindCache[code]    =wind;
-      if(tideFlow) khoaTideFlowCache[code]=tideFlow;
+      if(tide)       khoaTideCache[code]       ={...tide,seaTemp:seaT,date:getTodayStr()};
+      if(current)    khoaCurrentCache[code]    =current;
+      if(wave)       khoaWaveCache[code]       =wave;
+      if(wind)       khoaWindCache[code]       =wind;
+      if(tideFlow)   khoaTideFlowCache[code]   =tideFlow;
+      if(tideSeries) khoaTideSeriesCache[code] =tideSeries;
     }),
     // 포인트별: 낚시지수 (핫스팟 우선)
     ...POINTS.filter(p=>p.hot).map(async pt=>{
