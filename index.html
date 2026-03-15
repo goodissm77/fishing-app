@@ -1154,6 +1154,8 @@ async function fetchMyWx(lat,lng,label){
 // ※ data.go.kr 인증키를 아래 YOUR_API_KEY 자리에 붙여넣으세요
 // ════════════════════════════════════════
 const KHOA_KEY = 'a14286461c28ef6ad768bc83c3322408f8e20eb18edec80fb01752f5e085e53a';
+// CORS 프록시 (브라우저에서 직접 호출 불가한 API 우회)
+const CORS_PROXY = 'https://corsproxy.io/?url=';
 
 const TIDE_STATIONS = {
   'w1':'DT_0001','w2':'DT_0017','w3':'DT_0017','w4':'DT_0023',
@@ -1182,7 +1184,7 @@ async function fetchKhoaTide(stationCode){
   if(khoaTideCache[stationCode]&&khoaTideCache[stationCode].date===getTodayStr()) return khoaTideCache[stationCode];
   try{
     // 조석예보(고저조) API - 실제 신청한 엔드포인트
-    const url='https://apis.data.go.kr/1192136/tideFcstHghLw/getTideFcstHghLw'
+    const url=CORS_PROXY+'https://apis.data.go.kr/1192136/tideFcstHghLw/getTideFcstHghLw'
       +'?ServiceKey='+KHOA_KEY
       +'&ObsCode='+stationCode
       +'&Date='+getTodayStr()
@@ -1221,7 +1223,7 @@ async function fetchKhoaCurrent(stationCode){
   // 조류예보(시계열) API
   if(!KHOA_KEY||KHOA_KEY==='YOUR_API_KEY') return null;
   try{
-    const url='https://apis.data.go.kr/1192136/crntFcstTime/getCrntFcstTime'
+    const url=CORS_PROXY+'https://apis.data.go.kr/1192136/crntFcstTime/getCrntFcstTime'
       +'?ServiceKey='+KHOA_KEY
       +'&ObsCode='+stationCode
       +'&Date='+getTodayStr()
@@ -1260,7 +1262,7 @@ async function fetchKhoaCurrent(stationCode){
 async function fetchKhoaSeaTemp(stationCode){
   if(!KHOA_KEY||KHOA_KEY==='YOUR_API_KEY') return null;
   try{
-    const url='https://apis.data.go.kr/1192136/surveyWaterTemp/getSurveyWaterTemp'
+    const url=CORS_PROXY+'https://apis.data.go.kr/1192136/surveyWaterTemp/getSurveyWaterTemp'
       +'?ServiceKey='+KHOA_KEY+'&ObsCode='+stationCode+'&ResultType=json';
     const r=await fetch(url);
     const d=await r.json();
@@ -1274,7 +1276,7 @@ async function fetchKhoaSeaTemp(stationCode){
 async function fetchKhoaFishIdx(pt){
   if(!KHOA_KEY||KHOA_KEY==='YOUR_API_KEY') return null;
   try{
-    const url='https://apis.data.go.kr/1192136/fcstFishingv2/getFcstFishingv2'
+    const url=CORS_PROXY+'https://apis.data.go.kr/1192136/fcstFishingv2/getFcstFishingv2'
       +'?serviceKey='+KHOA_KEY+'&PageNo=1&numOfRows=3&resultType=json'
       +'&searchYmd='+getTodayStr()+'&obsLon='+pt.lng.toFixed(4)+'&obsLat='+pt.lat.toFixed(4);
     const r=await fetch(url);
@@ -1293,7 +1295,7 @@ const khoaCurrentCache = {}; // stationCode → {speed, dir, time}
 async function fetchKhoaWind(stationCode){
   if(!KHOA_KEY||KHOA_KEY==='YOUR_API_KEY') return null;
   try{
-    const url='https://apis.data.go.kr/1192136/surveyWind/getSurveyWind'
+    const url=CORS_PROXY+'https://apis.data.go.kr/1192136/surveyWind/getSurveyWind'
       +'?ServiceKey='+KHOA_KEY+'&ObsCode='+stationCode+'&ResultType=json';
     const r=await fetch(url);
     const d=await r.json();
@@ -1313,7 +1315,7 @@ async function fetchKhoaWind(stationCode){
 async function fetchKhoaWave(stationCode){
   if(!KHOA_KEY||KHOA_KEY==='YOUR_API_KEY') return null;
   try{
-    const url='https://apis.data.go.kr/1192136/noonWave/getNoonWave'
+    const url=CORS_PROXY+'https://apis.data.go.kr/1192136/noonWave/getNoonWave'
       +'?ServiceKey='+KHOA_KEY+'&ObsCode='+stationCode+'&ResultType=json';
     const r=await fetch(url);
     const d=await r.json();
@@ -1333,7 +1335,7 @@ async function fetchKhoaWave(stationCode){
 async function fetchKhoaTideFlow(stationCode){
   if(!KHOA_KEY||KHOA_KEY==='YOUR_API_KEY') return null;
   try{
-    const url='https://apis.data.go.kr/1192136/crntFcstFldEbb/getCrntFcstFldEbb'
+    const url=CORS_PROXY+'https://apis.data.go.kr/1192136/crntFcstFldEbb/getCrntFcstFldEbb'
       +'?ServiceKey='+KHOA_KEY
       +'&ObsCode='+stationCode
       +'&Date='+getTodayStr()
@@ -1360,7 +1362,7 @@ async function fetchKhoaTideFlow(stationCode){
 async function fetchKhoaBeachIdx(lat, lng){
   if(!KHOA_KEY||KHOA_KEY==='YOUR_API_KEY') return null;
   try{
-    const url='https://apis.data.go.kr/1192136/fcstBeachv2/getFcstBeachv2'
+    const url=CORS_PROXY+'https://apis.data.go.kr/1192136/fcstBeachv2/getFcstBeachv2'
       +'?ServiceKey='+KHOA_KEY
       +'&ResultType=json'
       +'&obsLat='+lat.toFixed(4)+'&obsLon='+lng.toFixed(4)
