@@ -1155,7 +1155,13 @@ async function fetchMyWx(lat,lng,label){
 // ════════════════════════════════════════
 const KHOA_KEY = 'a14286461c28ef6ad768bc83c3322408f8e20eb18edec80fb01752f5e085e53a';
 // CORS 프록시 (브라우저에서 직접 호출 불가한 API 우회)
-const CORS_PROXY = 'https://corsproxy.io/?url=';
+// CORS 프록시 (무료, 안정적)
+const CORS_PROXY = 'https://api.allorigins.win/raw?url=';
+async function proxyFetch(url){
+  const r = await fetch(CORS_PROXY + encodeURIComponent(url));
+  if(!r.ok) throw new Error('HTTP '+r.status);
+  return r;
+}
 
 const TIDE_STATIONS = {
   'w1':'DT_0001','w2':'DT_0017','w3':'DT_0017','w4':'DT_0023',
@@ -1184,37 +1190,50 @@ async function fetchKhoaTide(stationCode){
   if(khoaTideCache[stationCode]&&khoaTideCache[stationCode].date===getTodayStr()) return khoaTideCache[stationCode];
   try{
     // 조석예보(고저조) API - 실제 신청한 엔드포인트
-    const url=CORS_PROXY+'https://apis.data.go.kr/1192136/tideFcstHghLw/getTideFcstHghLw'
+    const rawUrl='https://apis.data.go.kr/1192136/tideFcstHghLw/getTideFcstHghLw'
       +'?ServiceKey='+KHOA_KEY
       +'&ObsCode='+stationCode
       +'&Date='+getTodayStr()
       +'&ResultType=json';
-    const r=await fetch(url);
+    const r=await proxyFetch(rawUrl);
     const d=await r.json();
     // 응답 구조 파싱 (다양한 형태 대응)
-    const items=d?.result?.data
-      ||d?.response?.body?.items?.item
-      ||d?.items?.item
-      ||[];
+    // 응답 전체 로그 (디버깅용)
+    console.log('조석 원시응답:', stationCode, JSON.stringify(d).slice(0,300));
+    
+    // 다양한 응답 구조 대응
+    let items = d?.result?.data
+      || d?.response?.body?.items?.item
+      || d?.items?.item
+      || d?.data
+      || [];
+    
+    // 단일 객체면 배열로
+    if(!Array.isArray(items)) items = items ? [items] : [];
+    
     const highs=[],lows=[];
-    const arr=Array.isArray(items)?items:(items?[items]:[]);
-    arr.forEach(item=>{
+    items.forEach(item=>{
       if(!item) return;
-      const code=(item.hl_code||item.hlCode||'').toString();
-      const time=(item.hl_time||item.hlTime||item.tide_time||'').toString();
-      const level=parseFloat(item.hl_level||item.hlLevel||item.tide_level||0);
+      // 가능한 모든 필드명 시도
+      const code = (item.hl_code||item.hlCode||item.tideType||item.type||'').toString().trim();
+      const time = (item.hl_time||item.hlTime||item.tide_time||item.tideTime||item.obsTime||'').toString().trim();
+      const level = parseFloat(item.hl_level||item.hlLevel||item.tide_level||item.tideLevel||item.wl||0);
       if(!time) return;
-      const parts=time.replace('시','').replace('분','').split(':');
-      const h=parseInt(parts[0]||0)+parseInt(parts[1]||0)/60;
-      if(code==='고조'||code==='H'||code==='high') highs.push({h,ht:level,time});
-      else if(code==='저조'||code==='L'||code==='low') lows.push({h,ht:level,time});
+      // HH:MM 형식 파싱
+      const clean = time.replace(/[^0-9:]/g,'');
+      const parts = clean.split(':');
+      const h = parseInt(parts[0]||0) + parseInt(parts[1]||0)/60;
+      if(isNaN(h)) return;
+      if(code==='고조'||code==='H'||code==='high'||code==='1') 
+        highs.push({h,ht:level,time});
+      else if(code==='저조'||code==='L'||code==='low'||code==='0') 
+        lows.push({h,ht:level,time});
     });
+    
     const result={highs,lows,date:getTodayStr()};
     khoaTideCache[stationCode]=result;
+    if(arr.length>0) console.log('조석 응답 샘플:', JSON.stringify(arr[0]).slice(0,150));
     console.log('조석 API 성공:', stationCode, highs.length+'만조', lows.length+'간조');
-    if(highs.length===0 && lows.length===0){
-      console.warn('조석 데이터 없음 - 응답:', JSON.stringify(d).slice(0,200));
-    }
     return result;
   }catch(e){
     console.warn('조석 API 오류:', stationCode, e.message);
@@ -1226,12 +1245,12 @@ async function fetchKhoaTideTimeSeries(stationCode){
   // 조석예보(시계열) - 조위 곡선 그래프용
   if(!KHOA_KEY||KHOA_KEY==='YOUR_API_KEY') return null;
   try{
-    const url=CORS_PROXY+'https://apis.data.go.kr/1192136/tideFcstTime/getTideFcstTime'
+    const rawUrl='https://apis.data.go.kr/1192136/tideFcstTime/getTideFcstTime'
       +'?ServiceKey='+encodeURIComponent(KHOA_KEY)
       +'&ObsCode='+stationCode
       +'&Date='+getTodayStr()
       +'&ResultType=json';
-    const r=await fetch(url);
+    const r=await proxyFetch(rawUrl);
     if(!r.ok){ console.warn('조석시계열 API '+r.status, stationCode); return null; }
     const d=await r.json();
     const items=d?.result?.data||d?.response?.body?.items?.item||[];
@@ -1253,12 +1272,12 @@ async function fetchKhoaCurrent(stationCode){
   // 조류예보(시계열) API
   if(!KHOA_KEY||KHOA_KEY==='YOUR_API_KEY') return null;
   try{
-    const url=CORS_PROXY+'https://apis.data.go.kr/1192136/crntFcstTime/getCrntFcstTime'
+    const rawUrl='https://apis.data.go.kr/1192136/crntFcstTime/getCrntFcstTime'
       +'?ServiceKey='+KHOA_KEY
       +'&ObsCode='+stationCode
       +'&Date='+getTodayStr()
       +'&ResultType=json';
-    const r=await fetch(url);
+    const r=await proxyFetch(rawUrl);
     const d=await r.json();
     const items=d?.result?.data
       ||d?.response?.body?.items?.item
@@ -1292,12 +1311,12 @@ async function fetchKhoaCurrent(stationCode){
 async function fetchKhoaSeaTemp(stationCode){
   if(!KHOA_KEY||KHOA_KEY==='YOUR_API_KEY') return null;
   try{
-    const url=CORS_PROXY+'https://apis.data.go.kr/1192136/surveyWaterTemp/getSurveyWaterTemp'
+    const rawUrl='https://apis.data.go.kr/1192136/surveyWaterTemp/getSurveyWaterTemp'
       +'?ServiceKey='+encodeURIComponent(KHOA_KEY)
       +'&ObsCode='+stationCode
       +'&ResultType=json'
       +'&numOfRows=1&pageNo=1';
-    const r=await fetch(url);
+    const r=await proxyFetch(rawUrl);
     const d=await r.json();
     const items=d?.result?.data||[];
     const item=Array.isArray(items)?items[0]:items;
@@ -1309,10 +1328,10 @@ async function fetchKhoaSeaTemp(stationCode){
 async function fetchKhoaFishIdx(pt){
   if(!KHOA_KEY||KHOA_KEY==='YOUR_API_KEY') return null;
   try{
-    const url=CORS_PROXY+'https://apis.data.go.kr/1192136/fcstFishingv2/getFcstFishingv2'
+    const rawUrl='https://apis.data.go.kr/1192136/fcstFishingv2/getFcstFishingv2'
       +'?serviceKey='+encodeURIComponent(KHOA_KEY)+'&PageNo=1&numOfRows=3&resultType=json'
       +'&searchYmd='+getTodayStr()+'&obsLon='+pt.lng.toFixed(4)+'&obsLat='+pt.lat.toFixed(4);
-    const r=await fetch(url);
+    const r=await proxyFetch(rawUrl);
     const d=await r.json();
     const items=d?.response?.body?.items?.item;
     const item=Array.isArray(items)?items[0]:items;
@@ -1330,9 +1349,9 @@ const khoaTideSeriesCache = {}; // stationCode → {speed, dir, time}
 async function fetchKhoaWind(stationCode){
   if(!KHOA_KEY||KHOA_KEY==='YOUR_API_KEY') return null;
   try{
-    const url=CORS_PROXY+'https://apis.data.go.kr/1192136/surveyWind/getSurveyWind'
+    const rawUrl='https://apis.data.go.kr/1192136/surveyWind/getSurveyWind'
       +'?ServiceKey='+encodeURIComponent(KHOA_KEY)+'&ObsCode='+stationCode+'&ResultType=json';
-    const r=await fetch(url);
+    const r=await proxyFetch(rawUrl);
     const d=await r.json();
     const items=d?.result?.data||[];
     const item=Array.isArray(items)?items[0]:items;
@@ -1350,12 +1369,12 @@ async function fetchKhoaWind(stationCode){
 async function fetchKhoaWave(stationCode){
   if(!KHOA_KEY||KHOA_KEY==='YOUR_API_KEY') return null;
   try{
-    const url=CORS_PROXY+'https://apis.data.go.kr/1192136/noonWave/getNoonWave'
+    const rawUrl='https://apis.data.go.kr/1192136/noonWave/getNoonWave'
       +'?ServiceKey='+encodeURIComponent(KHOA_KEY)
       +'&ObsCode='+stationCode
       +'&ResultType=json'
       +'&numOfRows=1&pageNo=1';
-    const r=await fetch(url);
+    const r=await proxyFetch(rawUrl);
     if(!r.ok){ console.warn('파랑 API '+r.status, stationCode); return null; }
     const d=await r.json();
     const items=d?.result?.data||d?.response?.body?.items?.item||[];
@@ -1374,12 +1393,12 @@ async function fetchKhoaWave(stationCode){
 async function fetchKhoaTideFlow(stationCode){
   if(!KHOA_KEY||KHOA_KEY==='YOUR_API_KEY') return null;
   try{
-    const url=CORS_PROXY+'https://apis.data.go.kr/1192136/crntFcstFldEbb/getCrntFcstFldEbb'
+    const rawUrl='https://apis.data.go.kr/1192136/crntFcstFldEbb/getCrntFcstFldEbb'
       +'?ServiceKey='+encodeURIComponent(KHOA_KEY)
       +'&ObsCode='+stationCode
       +'&Date='+getTodayStr()
       +'&ResultType=json';
-    const r=await fetch(url);
+    const r=await proxyFetch(rawUrl);
     const d=await r.json();
     const items=d?.result?.data||[];
     const arr=Array.isArray(items)?items:(items?[items]:[]);
@@ -1401,12 +1420,12 @@ async function fetchKhoaTideFlow(stationCode){
 async function fetchKhoaBeachIdx(lat, lng){
   if(!KHOA_KEY||KHOA_KEY==='YOUR_API_KEY') return null;
   try{
-    const url=CORS_PROXY+'https://apis.data.go.kr/1192136/fcstBeachv2/getFcstBeachv2'
+    const rawUrl='https://apis.data.go.kr/1192136/fcstBeachv2/getFcstBeachv2'
       +'?ServiceKey='+KHOA_KEY
       +'&ResultType=json'
       +'&obsLat='+lat.toFixed(4)+'&obsLon='+lng.toFixed(4)
       +'&searchYmd='+getTodayStr();
-    const r=await fetch(url);
+    const r=await proxyFetch(rawUrl);
     const d=await r.json();
     const items=d?.response?.body?.items?.item||[];
     const item=Array.isArray(items)?items[0]:items;
