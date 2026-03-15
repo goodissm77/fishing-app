@@ -1212,6 +1212,9 @@ async function fetchKhoaTide(stationCode){
     const result={highs,lows,date:getTodayStr()};
     khoaTideCache[stationCode]=result;
     console.log('조석 API 성공:', stationCode, highs.length+'만조', lows.length+'간조');
+    if(highs.length===0 && lows.length===0){
+      console.warn('조석 데이터 없음 - 응답:', JSON.stringify(d).slice(0,200));
+    }
     return result;
   }catch(e){
     console.warn('조석 API 오류:', stationCode, e.message);
@@ -1433,21 +1436,16 @@ async function fetchAllKhoa(){
   await Promise.all([
     // 관측소별: 조석+수온+조류+파랑+바람+창낙조 병렬 호출
     ...codes.map(async code=>{
-      const [tide, seaT, current, wave, wind, tideFlow, tideSeries]=await Promise.all([
-        fetchKhoaTide(code),
-        fetchKhoaSeaTemp(code),
-        fetchKhoaCurrent(code),
-        fetchKhoaWave(code),
-        fetchKhoaWind(code),
-        fetchKhoaTideFlow(code),
-        fetchKhoaTideTimeSeries(code)
+      // ✅ 성공 API만 호출 (403 나는 API 제외)
+      const [tide, seaT, current]=await Promise.all([
+        fetchKhoaTide(code),        // 조석예보(고저조) ✅
+        fetchKhoaSeaTemp(code),     // 실측수온 ✅
+        fetchKhoaCurrent(code),     // 조류예보(시계열) ✅
       ]);
-      if(tide)       khoaTideCache[code]       ={...tide,seaTemp:seaT,date:getTodayStr()};
-      if(current)    khoaCurrentCache[code]    =current;
-      if(wave)       khoaWaveCache[code]       =wave;
-      if(wind)       khoaWindCache[code]       =wind;
-      if(tideFlow)   khoaTideFlowCache[code]   =tideFlow;
-      if(tideSeries) khoaTideSeriesCache[code] =tideSeries;
+      if(tide)    khoaTideCache[code]    ={...tide,seaTemp:seaT,date:getTodayStr()};
+      if(current) khoaCurrentCache[code] =current;
+      // 아래 API들은 403 오류로 일시 비활성화
+      // fetchKhoaWave, fetchKhoaWind, fetchKhoaTideFlow, fetchKhoaTideTimeSeries
     }),
     // 포인트별: 낚시지수 (핫스팟 우선)
     ...POINTS.filter(p=>p.hot).map(async pt=>{
