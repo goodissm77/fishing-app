@@ -9,13 +9,12 @@
   <meta name="apple-mobile-web-app-title" content="투데이피싱">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="description" content="오늘의 낚시 포인트 추천 - 날씨·물때·어종 실시간 정보">
-  <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%231565C0'/><text y='.9em' font-size='80'>🎣</text></svg>">
 <title>투데이 피싱포인트</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&family=Montserrat:wght@400;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <style>
 :root {
   --sky:#E8F4FD;--sea:#2196F3;--sea-deep:#0D47A1;--sea-light:#64B5F6;
@@ -306,6 +305,7 @@ body{padding-bottom:env(safe-area-inset-bottom);}
   <div class="top-actions">
     <button class="top-btn" onclick="openMonthModal()">📅 <span id="month-label">1월</span></button>
     <button class="top-btn" onclick="toggleSearch()">🔍</button>
+    <button id="pwa-btn" class="top-btn" onclick="installApp()" style="display:none;background:rgba(255,255,255,0.25);">📲 설치</button>
     <button class="top-btn rec-main-btn" onclick="openRecommendPanel()">⭐ 추천</button>
   </div>
 </div>
@@ -342,7 +342,6 @@ body{padding-bottom:env(safe-area-inset-bottom);}
 <div id="nav">
   <button class="nav-tab active" id="tab-map" onclick="showMap()"><span class="tab-icon">🗺️</span><span class="tab-label">포인트</span></button>
   <button class="nav-tab" id="tab-record" onclick="openRecordPanel()"><span class="tab-icon">📔</span><span class="tab-label">내 기록</span></button>
-  <button class="nav-tab" id="install-btn" onclick="installApp()" style="display:none;"><span class="tab-icon">📲</span><span class="tab-label">앱설치</span></button>
 </div>
 
 <button id="fab" onclick="toggleAddPoint()">📌</button>
@@ -380,8 +379,8 @@ body{padding-bottom:env(safe-area-inset-bottom);}
           <div class="wind-cond-lbl" id="d-wind-cond-lbl">--</div>
         </div>
       </div>
-      <!-- 국립해양조사원 낚시지수 -->
-      <div id="d-fish-idx" style="display:none;margin-top:10px;background:linear-gradient(135deg,#E0F7FA,#E8F5E9);border-radius:10px;padding:9px 13px;font-size:12.5px;border:1px solid rgba(0,188,212,0.2);"></div>
+      <!-- 국립해양조사원 바다낚시지수 -->
+      <div id="d-fish-idx" style="display:none;margin-top:10px;background:linear-gradient(135deg,#E0F7FA,#E8F5E9);border-radius:10px;padding:9px 13px;font-size:12.5px;border:1px solid rgba(0,188,212,0.25);"></div>
     </div>
     <!-- 2. 물때 타임라인 -->
     <div class="d-section">
@@ -1107,122 +1106,6 @@ async function revGeo(lat,lng){
   }catch(e){}
 }
 
-// ════════════════════════════════════════
-// 국립해양조사원 API 설정
-// ※ data.go.kr 인증키를 아래에 붙여넣으세요
-// ════════════════════════════════════════
-const KHOA_KEY = 'a14286461c28ef6ad768bc83c3322408f8e20eb18edec80fb01752f5e085e53a';
-
-// 포인트별 가장 가까운 조위관측소 코드
-const TIDE_STATIONS = {
-  'w1':'DT_0001','w2':'DT_0017','w3':'DT_0017','w4':'DT_0023',
-  'w5':'DT_0017','w6':'DT_0001','w7':'DT_0001',
-  's1':'DT_0061','s2':'DT_0056','s3':'DT_0056','s4':'DT_0061',
-  's5':'DT_0051','s6':'DT_0066','s7':'DT_0056','s8':'DT_0051','s9':'DT_0061',
-  'e1':'DT_0075','e2':'DT_0079','e3':'DT_0082','e4':'DT_0085',
-  'e5':'DT_0075','e6':'DT_0079','e7':'DT_0075',
-  'j1':'DT_0091','j2':'DT_0091','j3':'DT_0091'
-};
-
-// 관측소 이름 (UI 표시용)
-const STATION_NAMES = {
-  'DT_0001':'인천','DT_0017':'보령','DT_0023':'군산','DT_0051':'부산',
-  'DT_0056':'통영','DT_0061':'여수','DT_0066':'완도','DT_0075':'묵호',
-  'DT_0079':'속초','DT_0082':'후포','DT_0085':'포항','DT_0091':'서귀포'
-};
-
-// 캐시
-const khoaTideCache = {}; // stationCode → {highs, lows, seaTemp, updatedAt}
-const khoaFishIdx   = {}; // pt.id → {idx, grade, seaTemp}
-
-function getTodayStr(){
-  const d=new Date();
-  return d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0');
-}
-
-// ── 조석예보(고/저조) API ──
-async function fetchKhoaTide(stationCode){
-  if(KHOA_KEY==='YOUR_API_KEY') return null;
-  if(khoaTideCache[stationCode]?.updatedAt === getTodayStr()) return khoaTideCache[stationCode];
-  try{
-    const url = `https://apis.data.go.kr/1192136/tideObsPreTab/getTideObsPreTab`
-      +`?ServiceKey=${KHOA_KEY}&ObsCode=${stationCode}&Date=${getTodayStr()}&ResultType=json`;
-    const r = await fetch(url);
-    const d = await r.json();
-    const items = d?.result?.data || d?.response?.body?.items?.item || [];
-    const highs=[], lows=[];
-    (Array.isArray(items)?items:[items]).forEach(item=>{
-      if(!item) return;
-      const code = item.hl_code||item.hlCode||'';
-      const time = item.hl_time||item.hlTime||'';
-      const level = parseFloat(item.hl_level||item.hlLevel||0);
-      const parts = time.split(':');
-      const h = parseInt(parts[0]||0) + parseInt(parts[1]||0)/60;
-      if(code==='고조'||code==='H') highs.push({h, ht:level, time});
-      else if(code==='저조'||code==='L') lows.push({h, ht:level, time});
-    });
-    const result = {highs, lows, updatedAt:getTodayStr()};
-    khoaTideCache[stationCode] = result;
-    return result;
-  }catch(e){ return null; }
-}
-
-// ── 실측 수온 API ──
-async function fetchKhoaSeaTemp(stationCode){
-  if(KHOA_KEY==='YOUR_API_KEY') return null;
-  try{
-    const url = `https://apis.data.go.kr/1192136/tideObsRecent/getTideObsRecent`
-      +`?ServiceKey=${KHOA_KEY}&ObsCode=${stationCode}&ResultType=json`;
-    const r = await fetch(url);
-    const d = await r.json();
-    const items = d?.result?.data || [];
-    const item = Array.isArray(items)?items[0]:items;
-    const t = parseFloat(item?.water_temp||item?.wtemp||0);
-    return t>0 ? t : null;
-  }catch(e){ return null; }
-}
-
-// ── 바다낚시지수 API ──
-async function fetchKhoaFishIdx(pt){
-  if(KHOA_KEY==='YOUR_API_KEY') return null;
-  try{
-    const url = `https://apis.data.go.kr/1192136/fcstFishinqv2/GetFcstFishingApiServicev2`
-      +`?serviceKey=${KHOA_KEY}&PageNo=1&numOfRows=5&resultType=json`
-      +`&searchYmd=${getTodayStr()}&obsLon=${pt.lng.toFixed(4)}&obsLat=${pt.lat.toFixed(4)}`;
-    const r = await fetch(url);
-    const d = await r.json();
-    const items = d?.response?.body?.items?.item;
-    const item = Array.isArray(items)?items[0]:items;
-    if(item){
-      return {
-        idx:   parseFloat(item.fishingIdx||item.fcstVal||3),
-        grade: item.fcstGrade||item.fishingGrade||'보통',
-        seaTemp: parseFloat(item.seaTemp||item.waterTemp||0)
-      };
-    }
-  }catch(e){}
-  return null;
-}
-
-// ── 전체 포인트 낚시지수 + 대표 관측소 수온 병렬 호출 ──
-async function fetchAllKhoa(){
-  if(KHOA_KEY==='YOUR_API_KEY') return;
-  const stationCodes = [...new Set(Object.values(TIDE_STATIONS))];
-  await Promise.all([
-    // 조석 + 수온
-    ...stationCodes.map(async code=>{
-      const tide = await fetchKhoaTide(code);
-      const seaT = await fetchKhoaSeaTemp(code);
-      if(tide) khoaTideCache[code] = {...tide, seaTemp:seaT};
-    }),
-    // 낚시지수 (대표 포인트만 - 핫스팟 우선)
-    ...POINTS.filter(pt=>pt.hot).map(async pt=>{
-      const fi = await fetchKhoaFishIdx(pt);
-      if(fi) khoaFishIdx[pt.id] = fi;
-    })
-  ]);
-}
-
 // Open-Meteo 단일 API (빠른 응답)
 async function getBestWind(lat,lng){
   try{
@@ -1257,6 +1140,105 @@ async function fetchMyWx(lat,lng,label){
     if(label) document.getElementById('ws-loc').textContent='📍 '+label;
     setTideLbl('ws-stub'); // tide in strip removed per request
   }catch(e){ console.log('wx err',e); }
+}
+
+
+// ════════════════════════════════════════
+// 국립해양조사원 API 설정
+// ※ data.go.kr 인증키를 아래 YOUR_API_KEY 자리에 붙여넣으세요
+// ════════════════════════════════════════
+const KHOA_KEY = 'a14286461c28ef6ad768bc83c3322408f8e20eb18edec80fb01752f5e085e53a';
+
+const TIDE_STATIONS = {
+  'w1':'DT_0001','w2':'DT_0017','w3':'DT_0017','w4':'DT_0023',
+  'w5':'DT_0017','w6':'DT_0001','w7':'DT_0001',
+  's1':'DT_0061','s2':'DT_0056','s3':'DT_0056','s4':'DT_0061',
+  's5':'DT_0051','s6':'DT_0066','s7':'DT_0056','s8':'DT_0051','s9':'DT_0061',
+  'e1':'DT_0075','e2':'DT_0079','e3':'DT_0082','e4':'DT_0085',
+  'e5':'DT_0075','e6':'DT_0079','e7':'DT_0075',
+  'j1':'DT_0091','j2':'DT_0091','j3':'DT_0091'
+};
+const STATION_NAMES = {
+  'DT_0001':'인천','DT_0017':'보령','DT_0023':'군산','DT_0051':'부산',
+  'DT_0056':'통영','DT_0061':'여수','DT_0066':'완도',
+  'DT_0075':'묵호','DT_0079':'속초','DT_0082':'후포','DT_0085':'포항','DT_0091':'서귀포'
+};
+const khoaTideCache = {};
+const khoaFishIdx   = {};
+
+function getTodayStr(){
+  const d=new Date();
+  return d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0');
+}
+
+async function fetchKhoaTide(stationCode){
+  if(!KHOA_KEY||KHOA_KEY==='YOUR_API_KEY') return null;
+  if(khoaTideCache[stationCode]&&khoaTideCache[stationCode].date===getTodayStr()) return khoaTideCache[stationCode];
+  try{
+    const url='https://apis.data.go.kr/1192136/tideObsPreTab/getTideObsPreTab'
+      +'?ServiceKey='+KHOA_KEY+'&ObsCode='+stationCode+'&Date='+getTodayStr()+'&ResultType=json';
+    const r=await fetch(url);
+    const d=await r.json();
+    const items=d?.result?.data||[];
+    const highs=[],lows=[];
+    (Array.isArray(items)?items:[items]).forEach(item=>{
+      if(!item) return;
+      const code=item.hl_code||'';
+      const time=item.hl_time||'';
+      const level=parseFloat(item.hl_level||0);
+      const parts=time.split(':');
+      const h=parseInt(parts[0]||0)+parseInt(parts[1]||0)/60;
+      if(code==='고조'||code==='H') highs.push({h,ht:level,time});
+      else if(code==='저조'||code==='L') lows.push({h,ht:level,time});
+    });
+    const result={highs,lows,date:getTodayStr()};
+    khoaTideCache[stationCode]=result;
+    return result;
+  }catch(e){return null;}
+}
+
+async function fetchKhoaSeaTemp(stationCode){
+  if(!KHOA_KEY||KHOA_KEY==='YOUR_API_KEY') return null;
+  try{
+    const url='https://apis.data.go.kr/1192136/tideObsRecent/getTideObsRecent'
+      +'?ServiceKey='+KHOA_KEY+'&ObsCode='+stationCode+'&ResultType=json';
+    const r=await fetch(url);
+    const d=await r.json();
+    const items=d?.result?.data||[];
+    const item=Array.isArray(items)?items[0]:items;
+    const t=parseFloat(item?.water_temp||item?.wtemp||0);
+    return t>0?t:null;
+  }catch(e){return null;}
+}
+
+async function fetchKhoaFishIdx(pt){
+  if(!KHOA_KEY||KHOA_KEY==='YOUR_API_KEY') return null;
+  try{
+    const url='https://apis.data.go.kr/1192136/fcstFishinqv2/GetFcstFishingApiServicev2'
+      +'?serviceKey='+KHOA_KEY+'&PageNo=1&numOfRows=3&resultType=json'
+      +'&searchYmd='+getTodayStr()+'&obsLon='+pt.lng.toFixed(4)+'&obsLat='+pt.lat.toFixed(4);
+    const r=await fetch(url);
+    const d=await r.json();
+    const items=d?.response?.body?.items?.item;
+    const item=Array.isArray(items)?items[0]:items;
+    if(item) return {idx:parseFloat(item.fishingIdx||item.fcstVal||3),grade:item.fcstGrade||item.fishingGrade||'보통',seaTemp:parseFloat(item.seaTemp||0)};
+  }catch(e){}
+  return null;
+}
+
+async function fetchAllKhoa(){
+  if(!KHOA_KEY||KHOA_KEY==='YOUR_API_KEY') return;
+  const codes=[...new Set(Object.values(TIDE_STATIONS))];
+  await Promise.all([
+    ...codes.map(async code=>{
+      const [tide,seaT]=await Promise.all([fetchKhoaTide(code),fetchKhoaSeaTemp(code)]);
+      if(tide) khoaTideCache[code]={...tide,seaTemp:seaT,date:getTodayStr()};
+    }),
+    ...POINTS.filter(p=>p.hot).map(async pt=>{
+      const fi=await fetchKhoaFishIdx(pt);
+      if(fi) khoaFishIdx[pt.id]=fi;
+    })
+  ]);
 }
 
 async function fetchAllPtWx(){
@@ -1394,38 +1376,31 @@ function scorePoint(pt){
 
   // 🏄 서프 루어 가중치 (4~9월 해변 서프 시즌)
   if((pt.fishStyle||[]).includes('서프')){
-    score += (currentMonth>=3 && currentMonth<=8) ? 15 : 5;
+    score += (currentMonth>=3&&currentMonth<=8)?15:5;
   }
-
-  // 🎣 국립해양조사원 바다낚시지수 (1~5단계)
-  const fi = khoaFishIdx[pt.id];
-  if(fi) score += fi.idx * 6; // 최대 30점
-
-  // 🌡 실측 수온 기반 어종 활성도 보정
-  const stCode = TIDE_STATIONS[pt.id];
-  const khoaT = stCode && khoaTideCache[stCode];
-  if(khoaT && khoaT.seaTemp > 0){
-    const seaFish = pt.fish.filter(f=>FISH_DB[f]&&FISH_DB[f].season[m]>=1);
-    let tBonus = 0;
-    seaFish.forEach(fn=>{
+  // 🎣 바다낚시지수 반영
+  const _fi=khoaFishIdx[pt.id];
+  if(_fi) score+=_fi.idx*6;
+  // 🌡 실측수온 기반 어종 활성도
+  const _stc=TIDE_STATIONS[pt.id];
+  const _kc=_stc&&khoaTideCache[_stc];
+  if(_kc&&_kc.seaTemp>0){
+    let tb=0;
+    pt.fish.filter(f=>FISH_DB[f]&&FISH_DB[f].season[m]>=1).forEach(fn=>{
       const f=FISH_DB[fn];
-      if(f?.seaTemp?.opt){
-        const r=f.seaTemp.opt.replace('°C','').split('~').map(Number);
-        if(khoaT.seaTemp>=r[0]&&khoaT.seaTemp<=r[1]) tBonus+=4;
-      }
+      if(f?.seaTemp?.opt){const r=f.seaTemp.opt.replace('°C','').split('~').map(Number);if(_kc.seaTemp>=r[0]&&_kc.seaTemp<=r[1])tb+=4;}
     });
-    score += Math.min(tBonus, 20);
+    score+=Math.min(tb,20);
   }
-
-  // 물때 점수 (몇물 기준 세분화)
+  // 물때 점수 (몇물 기준 세분화) - 해역별 기준 적용
   const tideName = getTideName(getLunarDay());
   const tideScore = {
-    '3물':20,'4물':20,'5물':20,'6물':18,
-    '2물':14,'7물':14,
-    '1물':10,'8물':10,'9물':10,
-    '사리':8,
-    '10물':6,'11물':6,'12물':6,'13물':6,
-    '조금':3,'무시':1
+    '3물':20,'4물':20,'5물':20,'6물':18,  // 최적 (조류 활발, 입질 좋음)
+    '2물':14,'7물':14,                     // 양호
+    '1물':10,'8물':10,'9물':10,            // 보통
+    '사리':8,                              // 조류 너무 강해서 낚시 어려울 수 있음
+    '10물':6,'11물':6,'12물':6,'13물':6,   // 약한 조류
+    '조금':3,'무시':1                       // 조류 거의 없음
   };
   score += (tideScore[tideName] || 5);
 
@@ -1821,24 +1796,24 @@ async function loadDrawerWx(pt){
   document.getElementById('d-sky').textContent=wCode(wx.wcode);
   document.getElementById('d-temp').textContent=wx.temp.toFixed(1)+'°C';
   document.getElementById('d-wave').textContent=wx.wave.toFixed(1)+'m';
-  // 수온: API 실측 우선, 없으면 추정값
-  const stCodeWx = TIDE_STATIONS[pt.id];
-  const khoaWx = stCodeWx && khoaTideCache[stCodeWx];
-  if(khoaWx && khoaWx.seaTemp > 0){
-    document.getElementById('d-seatemp').textContent = khoaWx.seaTemp.toFixed(1)+'°C 📡';
+  // 수온: 실측 우선
+  const _dwStc=TIDE_STATIONS[pt.id];
+  const _dwKc=_dwStc&&khoaTideCache[_dwStc];
+  if(_dwKc&&_dwKc.seaTemp>0){
+    document.getElementById('d-seatemp').textContent=_dwKc.seaTemp.toFixed(1)+'°C 📡';
   } else {
-    document.getElementById('d-seatemp').textContent = estSeaT(pt.lat,currentMonth)+'°C(추정)';
+    document.getElementById('d-seatemp').textContent=estSeaT(pt.lat,currentMonth)+'°C';
   }
-  // 낚시지수 표시
-  const fiWx = khoaFishIdx[pt.id];
-  const fiEl = document.getElementById('d-fish-idx');
-  if(fiEl){
-    if(fiWx){
-      const fc = fiWx.idx>=4?'#26A69A':fiWx.idx>=3?'#2196F3':fiWx.idx>=2?'#FF8F00':'#FF5252';
-      const stars = '★'.repeat(Math.round(fiWx.idx))+'☆'.repeat(5-Math.round(fiWx.idx));
-      fiEl.innerHTML = `<span style="color:${fc};font-weight:700;">🎣 낚시지수 ${fiWx.idx}단계 ${stars} (${fiWx.grade})</span> <span style="font-size:10px;color:var(--gray-400);">· 국립해양조사원</span>`;
-      fiEl.style.display='block';
-    } else { fiEl.style.display='none'; }
+  // 낚시지수
+  const _dwFi=khoaFishIdx[pt.id];
+  const _dwEl=document.getElementById('d-fish-idx');
+  if(_dwEl){
+    if(_dwFi){
+      const fc=_dwFi.idx>=4?'#26A69A':_dwFi.idx>=3?'#2196F3':_dwFi.idx>=2?'#FF8F00':'#FF5252';
+      const stars='★'.repeat(Math.round(_dwFi.idx))+'☆'.repeat(5-Math.round(_dwFi.idx));
+      _dwEl.innerHTML='<span style="color:'+fc+';font-weight:700;">🎣 낚시지수 '+_dwFi.idx+'단계 '+stars+' ('+_dwFi.grade+')</span><span style="font-size:10px;color:#9BA5B0;"> · 국립해양조사원</span>';
+      _dwEl.style.display='block';
+    } else { _dwEl.style.display='none'; }
   }
   const w=wx.wind;
   const vEl=document.getElementById('d-wind-val');
@@ -1883,26 +1858,23 @@ function renderTideTl(pt){
   const fillEl=document.getElementById('d-tide-fill');
   if(fillEl){fillEl.style.width=str+'%';fillEl.style.background=str>=70?'linear-gradient(90deg,#FF6B6B,#FF8E53)':str>=40?'linear-gradient(90deg,#42A5F5,#00E5FF)':'linear-gradient(90deg,#78909C,#B0BEC5)';}
 
-  // 국립해양조사원 실제 조석 데이터 우선 사용
-  const stCode = TIDE_STATIONS[pt.id];
-  const khoaTide = stCode && khoaTideCache[stCode];
-  let tides = [];
-  let isRealData = false;
-
-  if(khoaTide && (khoaTide.highs?.length + khoaTide.lows?.length) > 0){
-    khoaTide.highs.forEach(t=>tides.push({type:'high',h:t.h,ht:t.ht,time:t.time}));
-    khoaTide.lows.forEach(t=>tides.push({type:'low',h:t.h,ht:t.ht,time:t.time}));
+  // 국립해양조사원 실측 조석 우선 사용
+  const _rtStc=TIDE_STATIONS[pt.id];
+  const _rtKc=_rtStc&&khoaTideCache[_rtStc];
+  let tides=[];
+  if(_rtKc&&(_rtKc.highs||[]).length+(_rtKc.lows||[]).length>0){
+    (_rtKc.highs||[]).forEach(t=>tides.push({type:'high',h:t.h,ht:t.ht}));
+    (_rtKc.lows||[]).forEach(t=>tides.push({type:'low',h:t.h,ht:t.ht}));
     tides.sort((a,b)=>a.h-b.h);
-    isRealData = true;
-    // 실측 수온 표시
-    if(khoaTide.seaTemp > 0){
-      const stEl = document.getElementById('d-seatemp');
-      if(stEl) stEl.textContent = khoaTide.seaTemp.toFixed(1)+'°C 📡';
+    // 실측 수온 반영
+    if(_rtKc.seaTemp>0){
+      const stEl=document.getElementById('d-seatemp');
+      if(stEl) stEl.textContent=_rtKc.seaTemp.toFixed(1)+'°C 📡';
     }
     // 관측소명 표시
-    const stName = STATION_NAMES[stCode]||stCode;
-    document.getElementById('d-tide-sub').textContent =
-      ;
+    const stNm=STATION_NAMES[_rtStc]||_rtStc;
+    document.getElementById('d-tide-sub').textContent=
+      '음력 '+Math.min(30,Math.max(1,Math.round(age)))+'일 · 조류 '+strLabel+' · 📡 '+stNm+'관측소';
   } else {
     // API 없을 때 음력 추정
     const lo=(pt.lng-126)*0.4;
@@ -2192,29 +2164,26 @@ function setTideLbl(){}
 </script>
 
   <script>
-    if('serviceWorker' in navigator){
-      window.addEventListener('load', ()=>{
-        navigator.serviceWorker.register('sw.js').catch(()=>{});
-      });
-    }
-    // 홈화면 추가 프롬프트
+    // PWA 홈화면 추가 버튼 (크롬 자동 프롬프트)
     let deferredPrompt;
     window.addEventListener('beforeinstallprompt', e=>{
       e.preventDefault();
       deferredPrompt = e;
-      const btn = document.getElementById('install-btn');
+      const btn = document.getElementById('pwa-btn');
       if(btn) btn.style.display='flex';
     });
     function installApp(){
       if(deferredPrompt){
         deferredPrompt.prompt();
-        deferredPrompt.userChoice.then(()=>{ deferredPrompt=null; });
-        const btn = document.getElementById('install-btn');
-        if(btn) btn.style.display='none';
+        deferredPrompt.userChoice.then(r=>{
+          deferredPrompt=null;
+          const btn=document.getElementById('pwa-btn');
+          if(btn) btn.style.display='none';
+        });
       }
     }
     window.addEventListener('appinstalled', ()=>{
-      const btn = document.getElementById('install-btn');
+      const btn=document.getElementById('pwa-btn');
       if(btn) btn.style.display='none';
     });
   </script>
